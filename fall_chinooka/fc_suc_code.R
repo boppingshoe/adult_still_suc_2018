@@ -16,25 +16,29 @@ model{
       z[i,t]~ dbern(phi[i,t-1]* z[i,t-1])
       y[i,t]~ dbern(p[t-1]* z[i,t])
     }
-    # phi[i,1]<- g_0*exp(-g_1*ftt[i] -eps[i])
-    phi[i,1]<- b_0+ b_juld*juld[i]+ b_temp*temp[i]+ w*b_temp2*temp2[i]+
-      b_dis*dis[i]+ b_trans*trans[i]+ a_yr[yr[i]]
-    phi[i,2]<- phi_2
+    logit(phi[i,1])<- b_0+ b_juld*juld[i]+ b_temp*temp[i]+ w1*b_temp2*temp2[i]+
+      b_dis*dis[i]+ b_trans*trans[i]+ a_yr[yr[i]]+ g_ftt*ftt[i]#+ w2*g_ftt2*ftt2[i]
+    phi[i,2]<- phi2p3
     
-    phi[i,1]<- g_0*exp(-g_1*ftt[i] -eps[i])
-    eps[i]~ dlnorm(0, tau_phi)
-
+    # phi[i,1]<- g_0*exp(-g_1*ftt[i] -eps[i])
+    # logit(phi_rep[i])<- g_0+ g_ftt*ftt[i]+ w2*g_ftt2*ftt2[i]
+    # eps[i]<- -(log(phi[i,1]/g_0) / g_1*ftt[i])
+    # eps[i]~ dlnorm(0, tau_phi)
+    # eps[i]~ dlnorm(0, 0.01)
+    
     # FTT
+    ftt2[i]<- pow(236/vel[i], 2)
     ftt[i]<- 236/vel[i]
-    vel[i]~ dnorm(mu, tau_v)T(0,)
+    # vel[i]~ dnorm(mu, tau_v)T(0,)
+    vel[i]~ dnorm(mu, 0.01)T(0,)
   }
   
   # priors
   # CJS
-  phi_2~ dunif(0.5, 1) #phi2*p3
+  phi2p3~ dunif(0.5, 1) #phi2*p3
   p[1]~ dunif(0.5, 1)
   p[2]<- 1
-  tau_phi~ dgamma(1,0.25)
+  # tau_phi~ dgamma(1,0.25)
   
   b_0~ dt(0, 0.1, 1)
   b_juld~ dt(0, 0.4, 1)
@@ -47,13 +51,17 @@ model{
   for (j in 1:15){
     a_yr[j]~ dnorm(0, tau_yr)
   }
-  w~ dbern(0.5)
+  w1~ dbern(0.5)
+  # w2~ dbern(0.5)
   # FTT
   mu~ dnorm(0, 0.01)
-  g_0~ dunif(0, 1)
-  g_1~ dunif(0, 1)
-  sigma_v~ dunif(0, 10)
-  tau_v<- pow(sigma_v, -2)
+  # g_0~ dunif(0, 1)
+  # g_1~ dunif(0, 1)
+  # g_0~ dt(0, 0.1, 1)
+  g_ftt~ dt(0, 0.4, 1)
+  g_ftt2~ dt(0, 0.4, 1)
+  # sigma_v~ dunif(0, 10)
+  # tau_v<- pow(sigma_v, -2)
 
 }', fill=TRUE, file = paste0(wd,'fall_chinooka/fc_ipm/fc_ipm2.txt'))
 # ----
@@ -62,11 +70,11 @@ require(jagsUI)
 ipm_data<- prep_dat(fcs, typ='qua')
 str(ipm_data)
 # try out (6/8)
-parameters <- c('b_0','b_juld','b_temp','b_temp2','b_dis','b_trans','a_yr','p','phi_2','g_0','g_1','sigma_yr','w','tau_phi')#,'sigma_v')
-inits<- function() {list(z=cjs_init_z(ipm_data$y), b_0=runif(1,-1,1), b_juld=runif(1,-1,1), b_temp=runif(1,-1,1), b_temp2=runif(1,-1,1), b_dis=runif(1,-1,1), b_trans=runif(1,-1,1), p.1=runif(1,0.5,1), phi_2=runif(1,0.5,1), g_0=runif(1,0,1), g_1=runif(1,0,0.2), sigma_yr=runif(1,0,2), w=rbinom(1,1,0.5), tau_phi=rgamma(1,1,0.25))}#, sigma_v=runif(1,0,2)) }
-
-# nc<- 4   ;   ni<- 100   ;   nb<- 0   ;   nt<- 1 # test run
-nc<- 4   ;   ni<- 80000   ;   nb<-10000   ;   nt<- 7
+parameters <- c('b_0','b_juld','b_temp','b_temp2','b_dis','b_trans','a_yr','p','phi2p3','sigma_yr','w1','b_ftt','b_ftt2','g_ftt','g_ftt2')#,'w2','sigma_v')
+inits<- function() {list(z=cjs_init_z(ipm_data$y), b_0=runif(1,-1,1), b_juld=runif(1,-1,1), b_temp=runif(1,-1,1), b_temp2=runif(1,-1,1), b_dis=runif(1,-1,1), b_trans=runif(1,-1,1), p.1=runif(1,0.5,1), phi2p3=runif(1,0.5,1), sigma_yr=runif(1,0,2), w1=rbinom(1,1,0.5), b_ftt=runif(1,-1,1), b_ftt2=runif(1,-1,1), g_ftt=runif(1,-1,1), g_ftt2=runif(1,-1,1))}#, w2=rbinom(1,1,0.5), sigma_v=runif(1,0,2)) }
+# tau_phi=rgamma(1,1,0.25))}#
+nc<- 4   ;   ni<- 100   ;   nb<- 0   ;   nt<- 1 # test run
+# nc<- 4   ;   ni<- 80000   ;   nb<-10000   ;   nt<- 7
 ipm_out<- jags(ipm_data, inits, parameters, "fall_chinooka/fc_ipm/fc_ipm2.txt", n.thin=nt, n.chains=nc, n.burnin=nb, n.iter=ni, parallel=TRUE)
 print(ipm_out)
 

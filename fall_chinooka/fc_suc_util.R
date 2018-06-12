@@ -77,8 +77,7 @@ prep_dat<- function(fcs, typ='qua'){
       yr=yr, vel=vel, juld2=juld2, temp2=temp2)
   } else {
     out_dat<- list(y=CH, n_occ=n_occ, n_ind=n_ind, z=known_state_cjs(CH),
-      juld=juld, temp=temp, dis=dis, trans=trans,
-      yr=yr, vel=vel)
+      juld=juld, temp=temp, dis=dis, trans=trans, yr=yr, vel=vel)
   }
   
   return(out_dat)
