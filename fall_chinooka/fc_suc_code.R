@@ -62,30 +62,27 @@ parameters <- c('b_0','b_juld','b_temp','b_temp2','b_dis','b_trans','a_yr','p','
 inits<- function() {list(z=cjs_init_z(im_data$y), b_0=runif(1,-1,1), b_juld=runif(1,-1,1), b_temp=runif(1,-1,1), b_temp2=runif(1,-1,1), b_dis=runif(1,-1,1), b_trans=runif(1,-1,1), p.1=runif(1,0.5,1), phi2p3=runif(1,0.5,1), g_0=runif(1,0.5,1), g_1=runif(1,0,0.1), sigma_yr=runif(1,0,2), w=rbinom(1,0,1))}
 # linear (not doing it)
 
-nc<- 4   ;   ni<- 100   ;   nb<- 0   ;   nt<- 1 # test run
-# nc<- 4   ;   ni<- 80000   ;   nb<-10000   ;   nt<- 7
+# nc<- 4   ;   ni<- 100   ;   nb<- 0   ;   nt<- 1 # test run
+nc<- 4   ;   ni<- 80000   ;   nb<-10000   ;   nt<- 7
 
 im_out<- jags(im_data, inits, parameters, "fall_chinooka/fc_im/fc_im.txt", n.thin=nt, n.chains=nc, n.burnin=nb, n.iter=ni, parallel=TRUE)
 # im_out<- autojags(im_data, inits, parameters, "fall_chinooka/fc_im/fc_im.txt", n.thin=nt, n.chains=nc, n.burnin=2000, iter.increment=5000, max.iter=42000, parallel=TRUE)
 im_out<- update(im_out, parameters.to.save=parameters, n.thin=1, n.chains=4, n.iter=5000, parallel=TRUE)
 print(im_out)
 
-
-
 im_sims_fc<- im_out$sims.list
 im_rhat_fc<- cbind(unlist(im_out$Rhat)[!is.na(unlist(im_out$Rhat))], unlist(im_out$n.eff)[unlist(im_out$n.eff)>1])
 # JAGS results saved as as a big table
-write.table(im_sims_fc, file='fall_chinooka/fc_im/im_sims2.txt')
-write.table(im_rhat_fc, file='fall_chinooka/fc_im/im_rhat2.txt')
+# write.table(im_sims_fc, file='fall_chinooka/fc_im/im_sims.txt')
+# write.table(im_rhat_fc, file='fall_chinooka/fc_im/im_rhat.txt')
 
 
 
 # convert saved JAGS results into vectors ----
-im_sims_fc<- read.table('fall_chinooka/fc_im/im_sims2.txt')
-im_rhat_fc<- read.table('fall_chinooka/fc_im/im_rhat2.txt')
+im_sims_fc<- read.table('fall_chinooka/fc_im/im_sims.txt')
+im_rhat_fc<- read.table('fall_chinooka/fc_im/im_rhat.txt')
 
-b_0_fc=im_sims_fc$b_0; b_juld_fc=im_sims_fc$b_juld; b_temp_fc=im_sims_fc$b_temp; b_temp2_fc=im_sims_fc$b_temp2; b_dis_fc=im_sims_fc$b_dis; b_trans_fc=im_sims_fc$b_trans; mcn_p_fc=im_sims_fc$p.1; phi2p2_fc=im_sims_fc$phi_2; g_0_fc=im_sims_fc$g_0; g_1_fc=im_sims_fc$g_1; sigma_yr_fc=im_sims_fc$sigma_yr; sigma_v_fc=im_sims_fc$sigma_v; devi_fc=im_sims_fc$deviance
-
+b_0_fc=im_sims_fc$b_0; b_juld_fc=im_sims_fc$b_juld; b_temp_fc=im_sims_fc$b_temp; b_temp2_fc=im_sims_fc$b_temp2; b_dis_fc=im_sims_fc$b_dis; b_trans_fc=im_sims_fc$b_trans; mcn_p_fc=im_sims_fc$p.1; phi2p3_fc=im_sims_fc$phi2p3; g_0_fc=im_sims_fc$g_0; g_1_fc=im_sims_fc$g_1; sigma_yr_fc=im_sims_fc$sigma_yr; devi_fc=im_sims_fc$deviance
 
 a_yr<- 3:17
 for(i in 1:15){
@@ -94,23 +91,23 @@ for(i in 1:15){
 ayrs<- data.frame(cbind(unlist(a_yr[1]), unlist(a_yr[2]), unlist(a_yr[3]), unlist(a_yr[4]), unlist(a_yr[5]), unlist(a_yr[6]), unlist(a_yr[7]), unlist(a_yr[8]), unlist(a_yr[9]), unlist(a_yr[10]), unlist(a_yr[11]), unlist(a_yr[12]), unlist(a_yr[13]), unlist(a_yr[14]), unlist(a_yr[15]) ))
 
 # output table ----
-outtab_fc<- cbind(b_0_fc, b_juld_fc, b_temp_fc, b_temp2_fc, b_dis_fc, b_trans_fc, ayrs[,1], ayrs[,2], ayrs[,3], ayrs[,4], ayrs[,5], ayrs[,6], ayrs[,7], ayrs[,8], ayrs[,9], ayrs[,10], ayrs[,11], ayrs[,12], ayrs[,13], ayrs[,14], ayrs[,15], mcn_p_fc, phi2p2_fc, g_0_fc, g_1_fc, sigma_yr_fc, sigma_v_fc, devi_fc)
+outtab_fc<- cbind(b_0_fc, b_juld_fc, b_temp_fc, b_temp2_fc, b_dis_fc, b_trans_fc, ayrs[,1], ayrs[,2], ayrs[,3], ayrs[,4], ayrs[,5], ayrs[,6], ayrs[,7], ayrs[,8], ayrs[,9], ayrs[,10], ayrs[,11], ayrs[,12], ayrs[,13], ayrs[,14], ayrs[,15], mcn_p_fc, phi2p3_fc, g_0_fc, g_1_fc, sigma_yr_fc, devi_fc)
 im_mean_fc<- cbind(colMeans(outtab_fc))
 im_se_fc<- cbind(apply(outtab_fc, 2, sd))
 im_cri_fc<- apply(outtab_fc, 2, function(x) quantile(x, c(0.025,0.975)))
 
 summ_fc<- data.frame(cbind(round(im_mean_fc,3), round(im_se_fc,3), paste0('(', round(im_cri_fc[1,], 3),', ', round(im_cri_fc[2,], 3),')'), round(im_rhat_fc, 3)))
-row.names(summ_fc)<- c('(Intercept)', 'Arrival Date', 'Temperature', 'Temperature2', 'Flow', 'Transported','Year 2003','Year 2004','Year 2005','Year 2006','Year 2007','Year 2008','Year 2009','Year 2010','Year 2011','Year 2012','Year 2013','Year 2014','Year 2015','Year 2016','Year 2017', 'Detection (McN)', '$\\phi_2\\cdot p_2$', '$\\gamma_0$', '$\\gamma_1$', '$\\sigma_{year}$', '$\\sigma_{vel}$','Deviance')
+row.names(summ_fc)<- c('(Intercept)', 'Arrival Date', 'Temperature', 'Temperature2', 'Flow', 'Transported','Year 2003','Year 2004','Year 2005','Year 2006','Year 2007','Year 2008','Year 2009','Year 2010','Year 2011','Year 2012','Year 2013','Year 2014','Year 2015','Year 2016','Year 2017', 'Detection (McN)', '$\\phi_2\\cdot p_3$', '$\\gamma_0$', '$\\gamma_1$', '$\\sigma_{year}$','Deviance')
 colnames(summ_fc)<- c('Mean','SD','95% CRI','$\\hat{R}$','Eff size')
 summ_fc
 
 # traceplot ----
 windows(8,9)
 par(mfrow=c(4,2))
-names(outtab_fc)<- c('b0 (Intercept)', 'b Arrival', 'b Temp', 'b Temp2', 'b Flow', 'b Trans', 'Year2003','Year2004','Year2005','Year2006','Year2007','Year2008','Year2009','Year2010','Year2011','Year2012','Year2013','Year2014','Year2015','Year2016','Year2017', 'McN Detect', 'Phi2p2', 'gamma0', 'gamma1', 'SigmaYr', 'SigmaVel', 'Deviance')
+names(outtab_fc)<- c('b0 (Intercept)', 'b Arrival', 'b Temp', 'b Temp2', 'b Flow', 'b Trans', 'Year2003','Year2004','Year2005','Year2006','Year2007','Year2008','Year2009','Year2010','Year2011','Year2012','Year2013','Year2014','Year2015','Year2016','Year2017', 'McN Detect', 'Phi2p3', 'gamma0', 'gamma1', 'SigmaYr', 'Deviance')
 
 # ncol(outtab_fc)
-pn1<- 1:4; pn2<- 5:8; pn3<- 9:12; pn4<- 13:16; pn5<- 17:20; pn6<- 21:24; pn7<- 25:28
+pn1<- 1:4; pn2<- 5:8; pn3<- 9:12; pn4<- 13:16; pn5<- 17:20; pn6<- 21:24; pn7<- 25:27
 for(i in pn7){
   plot_pds(outtab_fc[,i], lab=names(outtab_fc)[i], colr='grey70')
 }
@@ -118,32 +115,33 @@ for(i in pn7){
 # surv plots ----
 windows(10,4)
 par(mfrow=c(1,2))
-niter<- 500
+niter<- 1000
 r<- sample(1:40000, size=niter)
 # surv vs. ftt
 # quantile(fcs$ftt, c(0.025,0.975), na.rm=TRUE)
 plot(0,0, xlim=c(0,80), ylim=c(0,1), ty='n',
   xlab='Travel Time (Days)', ylab='Survival')
-invisible(apply(rbind(outtab_fc[r,c('g_0_fc','g_1_fc','sigma_v_fc')]), 1,
+invisible(apply(rbind(outtab_fc[r,c('g_0_fc','g_1_fc')]), 1,
   function(x) surv_ftt(x, lcol='grey80')))
-invisible(apply(cbind(mean(outtab_fc[,'g_0_fc']),mean(outtab_fc[,'g_1_fc']), 0), 1,
+invisible(apply(rbind(colMeans(outtab_fc[,c('g_0_fc','g_1_fc')])), 1,
   function(x) surv_ftt(x, lcol='grey70',lw=3)))
-invisible(apply(cbind(outtab_fc[r,c('g_0_fc','g_1_fc','sigma_v_fc')]), 1,
+invisible(apply(cbind(outtab_fc[r,c('g_0_fc','g_1_fc')]), 1,
   function(x) surv_ftt(x, alpha=4, omega=18)))
-invisible(apply(cbind(mean(outtab_fc[,'g_0_fc']),mean(outtab_fc[,'g_1_fc']),0), 1,
+invisible(apply(rbind(colMeans(outtab_fc[,c('g_0_fc','g_1_fc')])), 1,
   function(x) surv_ftt(x, lcol='navy',lw=3, alpha=4, omega=18)))
-legend(40, 0.4, '', col='grey50', lwd=10, bty='n')
-legend(40, 0.4, 'Middle 95%', col='navy', lwd=3, bty='n')
+legend(40, 0.3, '', col='grey50', lwd=10, bty='n')
+legend(40, 0.3, 'Middle 95%', col='navy', lwd=3, bty='n')
 
-#surv vs. temp
+# surv vs. temp
+# travel time is intermediate between surv and temp
+# if travel time show little relation, temperature can be dampen
 # quantile(fcs$temp, c(0.025,0.975))
-plot(0,0, xlim=c(15,25), ylim=c(0,1), ty='n',
+plot(0,0, xlim=c(15,25), ylim=c(0.6,0.8), ty='n',
   xlab='Temperature (Celsius)', ylab='Survival')
-epsilon<- rnorm(niter, 0, 10)
-invisible(apply(cbind(outtab_fc[r, c('g_0_fc','g_1_fc','b_0_fc','b_temp_fc','b_temp2_fc','b_trans_fc')],epsilon), 1, function(x) surv_temp(x, lcol=c('grey80','grey90'), alpha=15, omega=25)))
-invisible(apply(cbind(rbind(colMeans(outtab_fc[r, c('g_0_fc','g_1_fc','b_0_fc','b_temp_fc','b_temp2_fc','b_trans_fc')])),epsilon[1]), 1, function(x) surv_temp(x, lcol=c('grey60','grey70'), lw=3, alpha=15, omega=25)))
-invisible(apply(cbind(outtab_fc[r, c('g_0_fc','g_1_fc','b_0_fc','b_temp_fc','b_temp2_fc','b_trans_fc')],epsilon), 1, function(x) surv_temp(x, alpha=17, omega=23)))
-invisible(apply(cbind(rbind(colMeans(outtab_fc[r, c('g_0_fc','g_1_fc','b_0_fc','b_temp_fc','b_temp2_fc','b_trans_fc')])),epsilon[1]), 1, function(x) surv_temp(x, lcol=c('navy','deeppink'), lw=3, alpha=17, omega=23)))
+invisible(apply(outtab_fc[r, c('g_0_fc','g_1_fc','b_0_fc','b_temp_fc','b_temp2_fc','b_trans_fc')], 1, function(x) surv_temp(x, lcol=c('grey80','grey90'), alpha=15, omega=25, sig_v=5) ))
+invisible(apply(rbind(colMeans(outtab_fc[r, c('g_0_fc','g_1_fc','b_0_fc','b_temp_fc','b_temp2_fc','b_trans_fc')])), 1, function(x) surv_temp(x, lcol=c('grey60','grey70'), lw=3, alpha=15, omega=25, sig_v=5)))
+invisible(apply(outtab_fc[r, c('g_0_fc','g_1_fc','b_0_fc','b_temp_fc','b_temp2_fc','b_trans_fc')], 1, function(x) surv_temp(x, alpha=17, omega=23, sig_v=5)))
+invisible(apply(rbind(colMeans(outtab_fc[r, c('g_0_fc','g_1_fc','b_0_fc','b_temp_fc','b_temp2_fc','b_trans_fc')]),epsilon[1]), 1, function(x) surv_temp(x, lcol=c('navy','deeppink'), lw=3, alpha=17, omega=23, sig_v=5)))
 legend(20, 0.3, c(' ',' '), col=c('cyan','lightpink'), lwd=10, bty='n')
 legend(20, 0.3, c('In-River','Transported'), col=c('navy','deeppink'), lwd=3, bty='n')
 

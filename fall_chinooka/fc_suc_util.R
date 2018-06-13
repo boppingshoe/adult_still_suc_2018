@@ -99,13 +99,14 @@ plot_pds<- function(pd, lab, nc=4, brks=50, colr=1){
 # plot results
 # surv vs. ftt
 surv_ftt<- function(g, lcol='grey50', lw=1, alpha=3, omega=70){
-  curve(exp(-(g[1]+ g[2]*x+ rnorm(1, 0, g[3])) ),
+  curve(exp(-(g[1]+ g[2]*x) ),
     alpha, omega, col=lcol, lwd=lw, add=TRUE)
 } 
 # surv vs. temp
-surv_temp<- function(b, lcol=c('cyan','lightpink'), lw=1, alpha=18.62, omega=21.87){
-  curve(exp(-b[1]-b[2]*(236/(b[3]+ b[4]*tempScale(x)+ b[5]*tempScale2(x^2)+ b[7]))), alpha, omega, col=lcol[1],lwd=lw, add=TRUE)
-  curve(exp(-b[1]-b[2]*(236/(b[3]+ b[4]*tempScale(x)+ b[5]*tempScale2(x^2)+ b[6]+ b[7]))), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+surv_temp<- function(b, lcol=c('cyan','lightpink'), lw=1, alpha=18.62, omega=21.87, sig_v=10){
+  eps_v<- rnorm(1, 0, sig_v)
+  curve(b[1]*exp(-b[2]*(236/(b[3]+ b[4]*tempScale(x)+ b[5]*tempScale2(x^2)+ eps_v))), alpha, omega, col=lcol[1],lwd=lw, add=TRUE)
+  curve(b[1]*exp(-b[2]*(236/(b[3]+ b[4]*tempScale(x)+ b[5]*tempScale2(x^2)+ b[6]+ eps_v))), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
 } 
 # ftt vs. temp (not in use)
 ftt_temp<- function(b, lcol=c('cyan','lightpink'), lw=1, alpha=18.62, omega=21.87){
