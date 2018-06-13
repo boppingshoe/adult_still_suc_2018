@@ -5,127 +5,101 @@ wd<- 'G:/STAFF/Bobby/css/adult_still_suc_2018/'
 source(file=paste0(wd, "fall_chinooka/fc_suc_util.R")) # where the functions are
 fcs<- fc_load_dat(wd)
 #
-# ipm ----
+# im ----
 cat('
 model{
 
   for (i in 1:n_ind){
     # CJS
+    phi[i,1]<- g_0*exp(- g_1*ftt[i])
+    phi[i,2]<- phi2p3
+    
     z[i,1]<- 1
     for (t in 2:n_occ){
       z[i,t]~ dbern(phi[i,t-1]* z[i,t-1])
       y[i,t]~ dbern(p[t-1]* z[i,t])
     }
-    logit(phi[i,1])<- b_0+ b_juld*juld[i]+ b_temp*temp[i]+ w1*b_temp2*temp2[i]+
-      b_dis*dis[i]+ b_trans*trans[i]+ a_yr[yr[i]]+ g_ftt*ftt[i]#+ w2*g_ftt2*ftt2[i]
-    phi[i,2]<- phi2p3
-    
-    # phi[i,1]<- g_0*exp(-g_1*ftt[i] -eps[i])
-    # logit(phi_rep[i])<- g_0+ g_ftt*ftt[i]+ w2*g_ftt2*ftt2[i]
-    # eps[i]<- -(log(phi[i,1]/g_0) / g_1*ftt[i])
-    # eps[i]~ dlnorm(0, tau_phi)
-    # eps[i]~ dlnorm(0, 0.01)
     
     # FTT
-    ftt2[i]<- pow(236/vel[i], 2)
     ftt[i]<- 236/vel[i]
-    # vel[i]~ dnorm(mu, tau_v)T(0,)
-    vel[i]~ dnorm(mu, 0.01)T(0,)
+    vel[i]~ dnorm(mu[i], 0.01)T(0,)
+    mu[i]<- b_0+ b_juld*juld[i]+ b_temp*temp[i]+ w*b_temp2*temp2[i]+
+      b_dis*dis[i]+ b_trans*trans[i]+ a_yr[yr[i]]
+    # mu[i]<- b_0+ b_juld*juld[i]+ b_temp*temp[i]+
+    # b_dis*dis[i]+ b_trans*trans[i]+ a_yr[yr[i]]
   }
   
   # priors
   # CJS
-  phi2p3~ dunif(0.5, 1) #phi2*p3
+  phi2p3~ dunif(0.5, 1)
   p[1]~ dunif(0.5, 1)
   p[2]<- 1
-  # tau_phi~ dgamma(1,0.25)
-  
+  g_0~ dunif(0.5, 1)
+  g_1~ dunif(0, 0.2)
+  # FTT
   b_0~ dt(0, 0.1, 1)
   b_juld~ dt(0, 0.4, 1)
   b_temp~ dt(0, 0.4, 1)
   b_temp2~ dt(0, 0.4, 1)
   b_dis~ dt(0, 0.4, 1)
   b_trans~ dt(0, 0.4, 1)
-  sigma_yr~ dt(0, 0.444, 1)T(0,5)
-  tau_yr<- pow(sigma_yr, -2)
   for (j in 1:15){
     a_yr[j]~ dnorm(0, tau_yr)
   }
-  w1~ dbern(0.5)
-  # w2~ dbern(0.5)
-  # FTT
-  mu~ dnorm(0, 0.01)
-  # g_0~ dunif(0, 1)
-  # g_1~ dunif(0, 1)
-  # g_0~ dt(0, 0.1, 1)
-  g_ftt~ dt(0, 0.4, 1)
-  g_ftt2~ dt(0, 0.4, 1)
-  # sigma_v~ dunif(0, 10)
-  # tau_v<- pow(sigma_v, -2)
+  sigma_yr~ dt(0, 0.444, 1)T(0,5)
+  tau_yr<- pow(sigma_yr, -2)
+  w~ dbern(0.5)
 
-}', fill=TRUE, file = paste0(wd,'fall_chinooka/fc_ipm/fc_ipm2.txt'))
+}', fill=TRUE, file = paste0(wd,'fall_chinooka/fc_im/fc_im.txt'))
 # ----
 require(jagsUI)
 
-ipm_data<- prep_dat(fcs, typ='qua')
-str(ipm_data)
-# try out (6/8)
-parameters <- c('b_0','b_juld','b_temp','b_temp2','b_dis','b_trans','a_yr','p','phi2p3','sigma_yr','w1','b_ftt','b_ftt2','g_ftt','g_ftt2')#,'w2','sigma_v')
-inits<- function() {list(z=cjs_init_z(ipm_data$y), b_0=runif(1,-1,1), b_juld=runif(1,-1,1), b_temp=runif(1,-1,1), b_temp2=runif(1,-1,1), b_dis=runif(1,-1,1), b_trans=runif(1,-1,1), p.1=runif(1,0.5,1), phi2p3=runif(1,0.5,1), sigma_yr=runif(1,0,2), w1=rbinom(1,1,0.5), b_ftt=runif(1,-1,1), b_ftt2=runif(1,-1,1), g_ftt=runif(1,-1,1), g_ftt2=runif(1,-1,1))}#, w2=rbinom(1,1,0.5), sigma_v=runif(1,0,2)) }
-# tau_phi=rgamma(1,1,0.25))}#
-nc<- 4   ;   ni<- 100   ;   nb<- 0   ;   nt<- 1 # test run
-# nc<- 4   ;   ni<- 80000   ;   nb<-10000   ;   nt<- 7
-ipm_out<- jags(ipm_data, inits, parameters, "fall_chinooka/fc_ipm/fc_ipm2.txt", n.thin=nt, n.chains=nc, n.burnin=nb, n.iter=ni, parallel=TRUE)
-print(ipm_out)
-
-
-
+im_data<- prep_dat(fcs, typ='qua')
+str(im_data)
 
 # quadratic
-parameters <- c('b_0','b_juld','b_temp','b_temp2','b_dis','b_trans','a_yr','p','phi_2','mort','sigma','w')
-inits<- function() {list(z=cjs_init_z(ipm_data$y), b_0=runif(1,-1,1), b_juld=runif(1,-1,1), b_temp=runif(1,-1,1), b_temp2=runif(1,-1,1), b_dis=runif(1,-1,1), b_trans=runif(1,-1,1), p.1=runif(1,0.5,1), phi_2=runif(1,0.5,1), mort=runif(1,0,0.2), sigma=runif(1,0,2), w=rbinom(1,1,0.5)) }
-# linear
-# parameters <- c('b_0','b_juld','b_temp','b_dis','b_trans','a_yr','p','phi_2','mort','sigma')
-# inits<- function() {list(z=cjs_init_z(ipm_data$y), b_0=runif(1,-1,1), b_juld=runif(1,-1,1), b_temp=runif(1,-1,1), b_dis=runif(1,-1,1), b_trans=runif(1,-1,1), p.1=runif(1,0.5,1), phi_2=runif(1,0.5,1), mort=runif(1,0,0.2), sigma=runif(1,0,2)) }
+parameters <- c('b_0','b_juld','b_temp','b_temp2','b_dis','b_trans','a_yr','p','phi2p3','g_0','g_1','sigma_yr','w')
+inits<- function() {list(z=cjs_init_z(im_data$y), b_0=runif(1,-1,1), b_juld=runif(1,-1,1), b_temp=runif(1,-1,1), b_temp2=runif(1,-1,1), b_dis=runif(1,-1,1), b_trans=runif(1,-1,1), p.1=runif(1,0.5,1), phi2p3=runif(1,0.5,1), g_0=runif(1,0.5,1), g_1=runif(1,0,0.1), sigma_yr=runif(1,0,2), w=rbinom(1,0,1))}
+# linear (not doing it)
 
-# nc<- 4   ;   ni<- 200   ;   nb<- 100   ;   nt<- 1 # test run
-nc<- 4   ;   ni<- 80000   ;   nb<-10000   ;   nt<- 7
+nc<- 4   ;   ni<- 100   ;   nb<- 0   ;   nt<- 1 # test run
+# nc<- 4   ;   ni<- 80000   ;   nb<-10000   ;   nt<- 7
 
-ipm_out<- jags(ipm_data, inits, parameters, "fall_chinooka/fc_ipm/fc_ipm.txt", n.thin=nt, n.chains=nc, n.burnin=nb, n.iter=ni, parallel=TRUE)
-# ipm_out<- autojags(ipm_data, inits, parameters, "fall_chinooka/fc_ipm/fc_ipm.txt", n.thin=nt, n.chains=nc, n.burnin=2000, iter.increment=5000, max.iter=42000, parallel=TRUE)
-ipm_out<- update(ipm_out, parameters.to.save=parameters, n.thin=1, n.chains=4, n.iter=5000, parallel=TRUE)
-print(ipm_out)
+im_out<- jags(im_data, inits, parameters, "fall_chinooka/fc_im/fc_im.txt", n.thin=nt, n.chains=nc, n.burnin=nb, n.iter=ni, parallel=TRUE)
+# im_out<- autojags(im_data, inits, parameters, "fall_chinooka/fc_im/fc_im.txt", n.thin=nt, n.chains=nc, n.burnin=2000, iter.increment=5000, max.iter=42000, parallel=TRUE)
+im_out<- update(im_out, parameters.to.save=parameters, n.thin=1, n.chains=4, n.iter=5000, parallel=TRUE)
+print(im_out)
 
 
 
-ipm_sims_fc<- ipm_out$sims.list
-ipm_rhat_fc<- cbind(unlist(ipm_out$Rhat)[!is.na(unlist(ipm_out$Rhat))], unlist(ipm_out$n.eff)[unlist(ipm_out$n.eff)>1])
+im_sims_fc<- im_out$sims.list
+im_rhat_fc<- cbind(unlist(im_out$Rhat)[!is.na(unlist(im_out$Rhat))], unlist(im_out$n.eff)[unlist(im_out$n.eff)>1])
 # JAGS results saved as as a big table
-write.table(ipm_sims_fc, file='fall_chinooka/fc_ipm/ipm_sims2.txt')
-write.table(ipm_rhat_fc, file='fall_chinooka/fc_ipm/ipm_rhat2.txt')
+write.table(im_sims_fc, file='fall_chinooka/fc_im/im_sims2.txt')
+write.table(im_rhat_fc, file='fall_chinooka/fc_im/im_rhat2.txt')
 
 
 
 # convert saved JAGS results into vectors ----
-ipm_sims_fc<- read.table('fall_chinooka/fc_ipm/ipm_sims2.txt')
-ipm_rhat_fc<- read.table('fall_chinooka/fc_ipm/ipm_rhat2.txt')
+im_sims_fc<- read.table('fall_chinooka/fc_im/im_sims2.txt')
+im_rhat_fc<- read.table('fall_chinooka/fc_im/im_rhat2.txt')
 
-b_0_fc=ipm_sims_fc$b_0; b_juld_fc=ipm_sims_fc$b_juld; b_temp_fc=ipm_sims_fc$b_temp; b_temp2_fc=ipm_sims_fc$b_temp2; b_dis_fc=ipm_sims_fc$b_dis; b_trans_fc=ipm_sims_fc$b_trans; mcn_p_fc=ipm_sims_fc$p.1; phi2p2_fc=ipm_sims_fc$phi_2; g_0_fc=ipm_sims_fc$g_0; g_1_fc=ipm_sims_fc$g_1; sigma_yr_fc=ipm_sims_fc$sigma_yr; sigma_v_fc=ipm_sims_fc$sigma_v; devi_fc=ipm_sims_fc$deviance
+b_0_fc=im_sims_fc$b_0; b_juld_fc=im_sims_fc$b_juld; b_temp_fc=im_sims_fc$b_temp; b_temp2_fc=im_sims_fc$b_temp2; b_dis_fc=im_sims_fc$b_dis; b_trans_fc=im_sims_fc$b_trans; mcn_p_fc=im_sims_fc$p.1; phi2p2_fc=im_sims_fc$phi_2; g_0_fc=im_sims_fc$g_0; g_1_fc=im_sims_fc$g_1; sigma_yr_fc=im_sims_fc$sigma_yr; sigma_v_fc=im_sims_fc$sigma_v; devi_fc=im_sims_fc$deviance
 
 
 a_yr<- 3:17
 for(i in 1:15){
-  a_yr[i]= ipm_sims_fc[5+i]
+  a_yr[i]= im_sims_fc[5+i]
 }
 ayrs<- data.frame(cbind(unlist(a_yr[1]), unlist(a_yr[2]), unlist(a_yr[3]), unlist(a_yr[4]), unlist(a_yr[5]), unlist(a_yr[6]), unlist(a_yr[7]), unlist(a_yr[8]), unlist(a_yr[9]), unlist(a_yr[10]), unlist(a_yr[11]), unlist(a_yr[12]), unlist(a_yr[13]), unlist(a_yr[14]), unlist(a_yr[15]) ))
 
 # output table ----
 outtab_fc<- cbind(b_0_fc, b_juld_fc, b_temp_fc, b_temp2_fc, b_dis_fc, b_trans_fc, ayrs[,1], ayrs[,2], ayrs[,3], ayrs[,4], ayrs[,5], ayrs[,6], ayrs[,7], ayrs[,8], ayrs[,9], ayrs[,10], ayrs[,11], ayrs[,12], ayrs[,13], ayrs[,14], ayrs[,15], mcn_p_fc, phi2p2_fc, g_0_fc, g_1_fc, sigma_yr_fc, sigma_v_fc, devi_fc)
-ipm_mean_fc<- cbind(colMeans(outtab_fc))
-ipm_se_fc<- cbind(apply(outtab_fc, 2, sd))
-ipm_cri_fc<- apply(outtab_fc, 2, function(x) quantile(x, c(0.025,0.975)))
+im_mean_fc<- cbind(colMeans(outtab_fc))
+im_se_fc<- cbind(apply(outtab_fc, 2, sd))
+im_cri_fc<- apply(outtab_fc, 2, function(x) quantile(x, c(0.025,0.975)))
 
-summ_fc<- data.frame(cbind(round(ipm_mean_fc,3), round(ipm_se_fc,3), paste0('(', round(ipm_cri_fc[1,], 3),', ', round(ipm_cri_fc[2,], 3),')'), round(ipm_rhat_fc, 3)))
+summ_fc<- data.frame(cbind(round(im_mean_fc,3), round(im_se_fc,3), paste0('(', round(im_cri_fc[1,], 3),', ', round(im_cri_fc[2,], 3),')'), round(im_rhat_fc, 3)))
 row.names(summ_fc)<- c('(Intercept)', 'Arrival Date', 'Temperature', 'Temperature2', 'Flow', 'Transported','Year 2003','Year 2004','Year 2005','Year 2006','Year 2007','Year 2008','Year 2009','Year 2010','Year 2011','Year 2012','Year 2013','Year 2014','Year 2015','Year 2016','Year 2017', 'Detection (McN)', '$\\phi_2\\cdot p_2$', '$\\gamma_0$', '$\\gamma_1$', '$\\sigma_{year}$', '$\\sigma_{vel}$','Deviance')
 colnames(summ_fc)<- c('Mean','SD','95% CRI','$\\hat{R}$','Eff size')
 summ_fc
