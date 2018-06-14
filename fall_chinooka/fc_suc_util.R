@@ -5,12 +5,19 @@ fc_load_dat<- function(wd){
   load(file=paste0(wd, "data_compile/fc_data/fcdat.Rdata"))
   fcs<- subset(fcdat, esu=='Snake') # limit comparison of transport to snake fish
   
-  fcs$ftt<- with(fcs, as.numeric(mca_obs- boa_obs))
+  # fcs$ftt<- with(fcs, as.numeric(mca_obs- boa_obs))
+  fcs$ftt<- with(fcs, as.numeric(iha_obs- boa_obs))
   fcs<- fcs[fcs$ftt>0|is.na(fcs$ftt),]
-  fcs$vel<- 236/(fcs$ftt) # distance/day
-  fcs$mca_det<- ifelse(is.na(fcs$mca_obs), 0, 1)
-  fcs$upp_det<- ifelse(!is.na(fcs$iha_obs), 1,
-    ifelse(is.na(fcs$gra_obs), 0, 1))
+  
+  # fcs$vel<- 236/(fcs$ftt) # distance/day (bon-mcn)
+  # fcs$mca_det<- ifelse(is.na(fcs$mca_obs), 0, 1)
+  # fcs$upp_det<- ifelse(!is.na(fcs$iha_obs), 1,
+  #   ifelse(is.na(fcs$gra_obs), 0, 1))
+  
+  fcs$vel<- 304/(fcs$ftt) # distance/day (bon-ihr)
+  fcs$low_det<- ifelse(!is.na(fcs$mca_obs), 1,
+    ifelse(is.na(fcs$iha_obs), 0, 1))
+  fcs$gra_det<- ifelse(is.na(fcs$gra_obs), 0, 1)
   fcs$tempbin<- cut(fcs$temp, breaks = c(7,17:24))
   fcs$tempbin2<- cut(fcs$temp, breaks = seq(7,24, by=1))
   
@@ -56,12 +63,12 @@ cjs_init_z<- function(ch){
   return(ch)
 }
 
-prep_dat<- function(fcs, typ='qua'){
-  CH<- with(fcs, cbind(rep(1,nrow(fcs)), mca_det, upp_det))
-  n_occ<- ncol(CH)
-  n_ind<- nrow(CH)
+prep_dat<- function(fcs, typ='w/cjs'){
+  n_ind<- nrow(fcs)
   juld<- fcs$jul_sca
   temp<- fcs$temp_sca
+  juld2<- scale(fcs$boa_jul^2)
+  temp2<- scale(fcs$temp^2)
   dis<- fcs$dis_sca
   trans<- ifelse(fcs$mig_his=='trans', 1, 0)
   yr<- fcs$boa_yr-2002
@@ -69,15 +76,18 @@ prep_dat<- function(fcs, typ='qua'){
   vel<- fcs$vel
   below20<- ifelse(fcs$temp<20, 1, 0)
   above21<- ifelse(fcs$temp>21, 1, 0)
-  if(typ=='qua') {
-    juld2<- scale(fcs$boa_jul^2)
-    temp2<- scale(fcs$temp^2)
+  if(typ=='w/cjs') {
+    # CH<- with(fcs, cbind(rep(1,nrow(fcs)), mca_det, upp_det))
+    CH<- with(fcs, cbind(rep(1,nrow(fcs)), low_det, gra_det))
+    n_occ<- ncol(CH)
     out_dat<- list(y=CH, n_occ=n_occ, n_ind=n_ind, z=known_state_cjs(CH),
       juld=juld, temp=temp, dis=dis, trans=trans,
       yr=yr, vel=vel, juld2=juld2, temp2=temp2)
   } else {
-    out_dat<- list(y=CH, n_occ=n_occ, n_ind=n_ind, z=known_state_cjs(CH),
-      juld=juld, temp=temp, dis=dis, trans=trans, yr=yr, vel=vel)
+    det<- fcs$mca_det
+    out_dat<- list(det=det, n_ind=n_ind,
+      juld=juld, temp=temp, dis=dis, trans=trans,
+      yr=yr, vel=vel, juld2=juld2, temp2=temp2)
   }
   
   return(out_dat)

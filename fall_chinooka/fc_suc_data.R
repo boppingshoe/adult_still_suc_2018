@@ -149,7 +149,7 @@ names(x) <- c("tag_id", "dim_id", "srrt", "rear", "length", "mig_yr", "tag_date"
    # Hence they are not available for detection at Lower Granite which would bias CJS results
    fc1 <- subset(x, !x$rel_site %in% c("LYFE","TUCR","CURP"))
    
-# (stop it now)
+# (stop it now) ----
 # Assign Origin ----
 
 x$pop <- NA
@@ -306,7 +306,8 @@ tdMost <- sqlQuery(channel, "
   INTO ##temp              
   FROM [fpc].[dbo].[tdgs_hourly_historic]
   WHERE DATEPART(YYYY, [date]) BETWEEN 2003 AND 2012 AND
-  --[site] in ('idsw','lmnw','lgsw','lgnw') 
+  --[site] in ('idsw','lmnw','lgsw','lgnw')
+  -- idsw (ice tail), lmnw (lomo tail), lgsw (goose tail), lgnw (granite tail)
   [site] = 'mcpw' 
   
   -- Compute daily averages
