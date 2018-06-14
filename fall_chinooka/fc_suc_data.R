@@ -290,7 +290,8 @@ names(td)[1]<- 'obs_date'
 # write.csv(td, file=paste0(wd, 'fc_data/data_compile/bon_temp_2003_2018.csv'), row.names = F)
 save(td, file=paste0(wd, "data_compile/fc_data/bon_temp_2003_2018.Rdata"))
 # ----
-# MCN tailrace temp
+
+# lower Snake tailrace temp
 # 2003 to 2012 ----
 channel <- odbcDriverConnect("case=nochange;Description=Global;DRIVER=SQL Server;SERVER=SQL2;UID=sa;PWD=frznool;WSID=CUTTHROAT;DATABASE=fpc;Network=DBMSSOCN")
 
@@ -299,16 +300,15 @@ tdMost <- sqlQuery(channel, "
   SET NOCOUNT ON
   SET ANSI_WARNINGS OFF
   
-  -- Clean data
   SELECT [date], [site],
   'temp_tdg' = CASE WHEN temp_tdg BETWEEN 0 AND 30 THEN temp_tdg ELSE NULL END,
   'tdgs' =    CASE WHEN tdgs BETWEEN 95 AND 140 THEN tdgs ELSE NULL END
   INTO ##temp              
   FROM [fpc].[dbo].[tdgs_hourly_historic]
   WHERE DATEPART(YYYY, [date]) BETWEEN 2003 AND 2012 AND
-  --[site] in ('idsw','lmnw','lgsw','lgnw')
+  [site] in ('mcpw','idsw','lmnw','lgsw','lgnw')
   -- idsw (ice tail), lmnw (lomo tail), lgsw (goose tail), lgnw (granite tail)
-  [site] = 'mcpw' 
+  -- [site] = 'mcpw' -- mcn tail
   
   -- Compute daily averages
   SELECT 'date' = CONVERT(date,[date]),
@@ -332,15 +332,14 @@ tdRest <- sqlQuery(channel, "
   SET NOCOUNT ON
   SET ANSI_WARNINGS OFF
   
-  -- Clean data
   SELECT [date], [site],
   'degf' = CASE WHEN degf BETWEEN 32 AND 86  THEN (degf - 32)/1.8 ELSE NULL END,
   'tdgs' = CASE WHEN tdgs BETWEEN 95 AND 140 THEN tdgs            ELSE NULL END
   INTO ##temp              
   FROM [fpc].[dbo].[tdg_spill_archive]
   WHERE [date] >  '2012-08-31 00:00:00' AND
-  --[site] in ('idsw','lmnw','lgsw','lgnw') 
-  [site] = 'mcpw' 
+  [site] in ('mcpw','idsw','lmnw','lgsw','lgnw') 
+  -- [site] = 'mcpw' 
   
   SELECT 'date' = CONVERT(date,[date]),
   [site],
@@ -362,21 +361,26 @@ tdRest$date <- as.Date(tdRest$date)
 tdMost <- subset(tdMost, tdMost$date < min(tdRest$date))
 
 # Stack 2 temperature datasets
-tdmcn <- rbind(tdMost, tdRest)
-tdmcn <- tdmcn[order(tdmcn$date),] 
+tdall <- rbind(tdMost, tdRest)
+sn<- c('MCPW','IDSW','LMNW','LGSW','LGNW')
+tn<- c('mcn','ihr','lmn','lgs','lgr')
+td<- list()
+for (i in 1:5){
+  td[[i]] <- subset(tdall, site==sn[i])[,-2]
+  allDates <- seq(min(td[[i]]$date), max(td[[i]]$date), 1)
+  missingDates <- allDates[!allDates %in% td[[i]]$date]
+  tmp <- data.frame(date=missingDates, temp=NA, tdgs=NA)
+  td[[i]] <- rbind(td[[i]], tmp)
+  td[[i]] <- td[[i]][order(td[[i]]$date),]
+  colnames(td[[i]])<- c('date', paste0(tn[i],'_temp'), paste0(tn[i],'_tdgs'))
+  if (any(diff(td[[i]]$date) != 1)) stop (paste('epic fail at', i))
+  if (i>1) td[[i]]<- merge(td[[i-1]], td[[i]], by='date')
+}
+tdls<- td[[5]]
+tdls <- tdls[order(tdls$date),]
+names(tdls)[1]<- 'obs_date'
 
-# There are 4 missing dates "2013-10-24" "2014-01-17" "2014-01-18" "2017-08-17"
-allDates <- seq(min(tdmcn$date), max(tdmcn$date), 1)
-(missingDates <- allDates[!allDates %in% tdmcn$date])
-tmp <- data.frame(date=missingDates, site="MCPW", temp=NA, tdgs=NA)
-tdmcn <- rbind(tdmcn, tmp)
-tdmcn <- tdmcn[order(tdmcn$date),]
-all(diff(tdmcn$date) == 1) # Should be true
-
-tdmcn$site<- NULL
-names(tdmcn)[1]<- 'obs_date'
-
-save(tdmcn, file=paste0(wd, "data_compile/fc_data/mcpw_temp_2003_2018.Rdata"))
+save(tdls, file=paste0(wd, "data_compile/fc_data/low_snake_temp_2003_2018.Rdata"))
 # ----
 
 
@@ -384,15 +388,15 @@ save(tdmcn, file=paste0(wd, "data_compile/fc_data/mcpw_temp_2003_2018.Rdata"))
 rm(list=ls())
 library(RODBC)
 wd<- 'G:/STAFF/Bobby/css/adult_still_suc_2018/'
-# BON and MCN ----
+# MCN, IHR and LGR ----
 channel <- odbcDriverConnect("case=nochange;Description=Global;
   DRIVER=SQL Server;SERVER=SQL2;UID=sa;PWD=frznool;
   WSID=CUTTHROAT;DATABASE=pittag;Network=DBMSSOCN")
 
-fd <- sqlQuery(channel, "
+fdall <- sqlQuery(channel, "
   SELECT site, date, AvgTotalDischarge, AvgTotalSpill, AvgTurbineDischarge, AvgUnitsOnLine, AvSpillPct = round(((AvgTotalSpill/AvgTotalDischarge) * 100),0)
   FROM [fpc].[dbo].[tbl_coe_mean_flow]
-  where site in ('BOA', 'MCN')
+  where site in ('MCN', 'IHR', 'LGR')
   --and date between '2003-01-01' and '2018-12-31'
   and datepart(YYYY,date) between '2003' and '2018'
   order by site, date
@@ -400,37 +404,59 @@ fd <- sqlQuery(channel, "
 
 odbcCloseAll()
 
-# load(file=paste0(wd, '/data compile/fd.Rdata'))
-fd$date<- as.Date(fd$date, format='%Y-%m-%d')
+fdall$date<- as.Date(fdall$date, format='%Y-%m-%d')
+names(fdall)<- c('site', 'date', 'dis', 'spill', 'turb', 'unit', 'spct')
 
-# nrow(subset(fd, site=='BOA')) # there's no BON data
-fd_mcn<- subset(fd, site=='MCN')[,-1]
-names(fd_mcn)<- c('obs_date', 'dis', 'spill', 'turb', 'unit', 'spct')
+sn<- c('MCN','IHR','LGR')
+fn<- c('mcn','ihr','lgr')
+fd<- list()
+for (i in 1:3){
+  fd[[i]] <- subset(fdall, site==sn[i])[,-1]
+  allDates <- seq(min(fd[[i]]$date), max(fd[[i]]$date), 1)
+  missingDates <- allDates[!allDates %in% fd[[i]]$date]
+  tmp <- data.frame(date=missingDates, dis=NA, spill=NA, turb=NA, unit=NA, spct=NA)
+  fd[[i]] <- rbind(fd[[i]], tmp)
+  fd[[i]] <- fd[[i]][order(fd[[i]]$date),]
+  colnames(fd[[i]])<- c('date', paste0(fn[i],'_dis'), paste0(fn[i],'_spill'),
+    paste0(fn[i],'_turb'), paste0(fn[i],'_unit'), paste0(fn[i],'_spct'))
+  if (any(diff(fd[[i]]$date) != 1)) stop (paste('epic fail at', i))
+  if (i>1) fd[[i]]<- merge(fd[[i-1]], fd[[i]], by='date')
+}
+fdls<- fd[[3]]
+fdls <- fdls[order(fdls$date),]
+names(fdls)[1]<- 'obs_date'
 
-# missing dates?
-allDates <- seq(min(fd_mcn$obs_date), max(fd_mcn$obs_date), 1)
-(missingDates <- allDates[!allDates %in% fd_mcn$obs_date]) # "2008-11-30" "2013-02-13" "2013-02-14"
-tmp <- data.frame(obs_date=missingDates, dis=NA, spill=NA, turb=NA, unit=NA, spct=NA)
-fd_mcn <- rbind(fd_mcn, tmp)
-fd_mcn <- fd_mcn[order(fd_mcn$obs_date),]
-all(diff(fd_mcn$obs_date) == 1) # Should be true
-rm(fd, tmp)
-
-# write.csv(fd_mcn, file=paste0(wd, 'fc_data/data_compile/mcn_flow_2003_2018.csv'), row.names = F)
-save(fd_mcn, file=paste0(wd, "data_compile/fc_data/mcn_flow_2003_2018.Rdata"))
+save(fdls, file=paste0(wd, "data_compile/fc_data/low_snake_flow_2003_2018.Rdata"))
 # ----
 
 
 # section 4: bring all data together
+rm(list=ls())
+wd<- 'G:/STAFF/Bobby/css/adult_still_suc_2018/'
+
 load(file=paste0(wd, "data_compile/fc_data/fc1.Rdata")) # fishy data
-fc1$obs_date<- as.Date(fc1$boa_obs)
-load(file=paste0(wd, 'data_compile/fc_data/mcpw_temp_2003_2018.Rdata')) # temper
-load(file=paste0(wd, "data_compile/fc_data/mcn_flow_2003_2018.Rdata")) # flow
+fcls<- subset(fc1, !is.na(mca_obs))
+fcls$obs_date<- as.Date(fcls$mca_obs)
+load(file=paste0(wd, 'data_compile/fc_data/low_snake_temp_2003_2018.Rdata')) # temper
+load(file=paste0(wd, "data_compile/fc_data/low_snake_flow_2003_2018.Rdata")) # flow
 
-fcdat<- merge(fc1, tdmcn, by='obs_date')
-fcdat<- merge(fcdat, fd_mcn, by='obs_date')
+fclsdat<- merge(fcls, tdls, by='obs_date')
+fclsdat<- merge(fclsdat, fdls, by='obs_date')
 
-save(fcdat, file=paste0(wd, "data_compile/fc_data/fcdat.Rdata"))
+save(fclsdat, file=paste0(wd, "data_compile/fc_data/fclsdat.Rdata"))
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
