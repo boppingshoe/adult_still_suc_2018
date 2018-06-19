@@ -1,0 +1,149 @@
+---
+title: "CSS Chapter for Adult Salmon and Steelhead Upstream Migration"
+date: "`r paste0(format(Sys.time(), '%B %d, %Y'), ' (', round(julian(Sys.time(), origin=as.Date('2017-01-21'))), ' down)')`"
+output:
+  word_document:
+    reference_docx: G:/STAFF/Bobby/memo/memo-styles.docx
+---
+<!--*"Didn't you guys burn down the White House?"*  
+**Donald Trump**, incorrectly referencing the War of 1812 with Canadian PM Trudeau-->
+
+<!--*"Tomorrow is the anniversary of the D-Day invasion. We obviously have a very long history with the government of Germany, and we have a strong relationship with the government of Germany."*
+**Heather Nauert**, State Department spokeswoman-->
+
+<!--*"Dear @StateDept: You have six months to educate Heather Nauert on the history and significance of Pearl Harbor before she cites it as an example of strong US-Japan relations. Get to it - you may need some time to catch her up."*
+**@aliciafoxrocks**-->
+
+----
+
+```{r setup, include=FALSE, echo=FALSE, warning=FALSE}
+library(knitr)
+library(pander)
+library(captioner)
+
+options(replace.assign=TRUE, width=80, digits=3, max.print="150",
+        show.signif.stars = FALSE, "scipen"=100)
+no_emphasis_table <- function(df){
+  the.row.names <- rownames(df) 
+
+  # For some reason, when 'pandoc' writes the markdown 
+  # table to LaTeX, it doesn't make the first column 
+  # wide enough unless some padding is added to the row 
+  # names
+  add.space <- function(x){
+    return(paste0(x, "&nbsp;"))
+  }
+  the.row.names.m <- as.vector(sapply(the.row.names, add.space))
+  rownames(df) <- NULL
+  df <- cbind(the.row.names.m, df)
+  colnames(df)[1] <- '' 
+
+  # Set horizontal justification for columns
+  v.justify <- vector()
+  v.justify[seq(1, length(df-1))] <- 'center'
+  v.justify[1] <- 'left'
+  v.justify[length(df)]<- 'right'
+  set.alignment(v.justify) 
+  return(df)
+}
+no_add_space <- function(df){
+  the.row.names <- rownames(df) 
+
+  the.row.names.m <- as.vector(the.row.names)
+  rownames(df) <- NULL
+  df <- cbind(the.row.names.m, df)
+  colnames(df)[1] <- '' 
+
+  # Set horizontal justification for columns
+  v.justify <- vector()
+  v.justify[seq(1, length(df-1))] <- 'center'
+  v.justify[1] <- 'left'
+  v.justify[length(df)]<- 'right'
+  set.alignment(v.justify) 
+  return(df)
+}
+
+t_num<- captioner(prefix='Table', style='b')
+f_num<- captioner(style='b')
+
+# traceplot
+trace<- function(x,i,nc){
+  l<- length(x)/nc
+  plot(c(1:l), x[1:l], ty='l', ylab=i, xlab='')#, xlim=c(0,1000))
+  lines(c(1:l), x[(l+1):(2*l)], col='grey30')
+  lines(c(1:l), x[(2*l+1):(3*l)], col='grey50')
+  lines(c(1:l), x[(3*l+1):(4*l)], col='grey70')
+}
+# automate diag plots
+plot_pds<- function(pd, lab, nc=4, brks=50, colr=1){
+  trace(pd, lab, nc)
+  hist(pd, breaks=brks, col=colr, freq=FALSE, xlab=NA, main=NA)
+}
+```
+
+```{r data, echo=FALSE}
+```
+
+```{r table-figure, echo=FALSE}
+ftv_table<- t_num(name='ftv_tbl', caption= 'Coefficient estimates for the fish travel velocity model.')
+
+trace_plots<- f_num(name='trace', caption= 'Traceplots of MCMC samplings and the posterior distribution of parameters.')
+```
+
+# Introduction
+The Comparative Survival Study (CSS) has been assessing adult salmon and steelhead upstream migration success through the Federal Columbia River Power System since 2010 Annual Report. Early analyses focused on regional concerns regarding high stray rates of Snake River steelhead (*Oncorhynchus mykiss*) and salmon that were transported as juveniles. Results indicated that salmon and steelhead that were transported downstream in the smolt transportation program had lower upstream migration success and higher stray rates. This was considered problematic for some middle Columbia River listed steelhead stocks which were affected by Snake River steelhead straying.
+
+In 2017, CSS revisited the subject of adult salmon and steelhead upstream migration success. This time, we responded to concerns regarding higher water temperatures occurring earlier and for longer periods in recent years. In addition, the CSS analysis of upstream migration success was expanded to evaluate upstream migration success of steelhead, summer Chinook (*O. tshawytscha*) and sockeye (*O. nerka*) to assess the effects of water temperature and smolt transportation on adult upstream migration. All species in our analysis showed a decrease in survival in warm water, and the survivals for transported fish started to decrease at a lower temperature compared to fish that migrated in-river.
+
+This year, we continued to assess the relationship between adult salmon and steelhead upstream migration and water temperature.
+
+* Relationship between temperature, travel time, and survival.
+
+
+# Methods
+
+# Results
+
+# Discussion
+
+# Reference
+
+Broms K.M., M.B.  Hooten, and  R.M. Fitzpatrick. 2016. Model selection and assessment for multi-species occupancy models. *Ecology* 97:1759-1770.
+
+Gelman A., A. Jakulin, M. Grazia Pittau, and Y-S Su.  2008. A weakly informative prior default prior distribution for logistic and other regression models. *Annals of Applied Statistics* 4:1360-1383.
+
+McCann J.M., B. Chockley, E. Cooper, B. Hsu, H. Schaller, S. Haeseker, R. Lesssard, C. Petrosky, T. Copeland, E. Tinus, E. Van Dyke, A. Storch, and D. Rawding. 2017. Comparative Survival Study of PIT-tagged Spring/Summer/Fall Chinook, Summer Steelhead, and Sockeye, 2017 Annual Report. BPA Project #19960200.
+
+# Appendix
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

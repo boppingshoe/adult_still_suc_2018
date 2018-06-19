@@ -6,7 +6,7 @@ source(file=paste0(wd, "fall_chinooka/fc_suc_util.R")) # where the functions are
 fcs<- fc_load_dat(wd)
 #
 ## intergrated model
-# full set up with cjs ----
+# full set up with cjs (needs modify for mcn-lgr reach) ----
 cat('
 model{
 
@@ -189,31 +189,31 @@ m
 # ----
 
 
+## low snake survivals vs. temperature
 # with GLM ----
 cat('
 model{
   
   for (i in 1:n_ind){
     # GLM
-    phi[i]<- g_0 * exp(- g_1*ftt[i])
     det[i]~ dbern(phi[i])
+    logit(phi[i])<- b_0+ b_juld*juld[i]+ b_temp*temp[i]+ b_ftt*ftt[i]+
+      w*b_txf*temp[i]*ftt[i]+ b_dis*dis[i]+ b_trans*trans[i]+ a_yr[yr[i]]
+    logit(phi_rep[i])<- b_0+ b_juld*juld[i]+ b_temp*temp[i]+ b_ftt*ftt[i]+
+      w*b_txf*temp[i]*ftt[i]+ b_dis*dis[i]+ b_trans*trans[i]+ a_yr[yr[i]]
 
     # FTT
-    ftt[i]<- 236/vel[i]
-    vel[i]~ dnorm(mu[i], tau_v)T(0,)
-    mu[i]<- b_0+ b_juld*juld[i]+ b_temp*temp[i]+ w*b_temp2*temp2[i]+
-      b_dis*dis[i]+ b_trans*trans[i]+ a_yr[yr[i]]
+    ftt[i]<- (225/vel[i]- 7.88)/ 4.29 # scaled ftt 
+    vel[i]~ dnorm(mu_v, tau_v)T(0,)
   }
+
   # priors
   # GLM
-  g_0~ dunif(0.5, 1)
-  g_1~ dunif(0, 0.2)  # maybe g_1 can be negative
-
-  # FTT
   b_0~ dt(0, 0.1, 1)
   b_juld~ dt(0, 0.4, 1)
   b_temp~ dt(0, 0.4, 1)
-  b_temp2~ dt(0, 0.4, 1)
+  b_ftt~ dt(0, 0.4, 1)
+  b_txf~ dt(0, 0.4, 1)
   b_dis~ dt(0, 0.4, 1)
   b_trans~ dt(0, 0.4, 1)
   for (j in 1:15){
@@ -222,21 +222,28 @@ model{
   sigma_yr~ dt(0, 0.444, 1)T(0,5)
   tau_yr<- pow(sigma_yr, -2)
   w~ dbern(0.5)
-  sigma_v~ dunif(0, 5)
+
+  # FTT
+  mu_v~ dt(0, 0.1, 1)T(0,)
+  sigma_v~ dt(0, 0.444, 1)T(0,)
   tau_v<- pow(sigma_v, -2)
-  
+
+  # posterior predictive check
+  phi_fit<- mean(phi_rep)
+
 }', fill=TRUE, file = paste0(wd,'fall_chinooka/fc_im/fc_im_glm.txt'))
-# ---- (still need refining sigma_v)
+# ----
 require(jagsUI)
 
 im_data<- prep_dat(fcs, typ='glm')
 str(im_data)
 
 # run JAGS ----
-parameters <- c('b_0','b_juld','b_temp','b_temp2','b_dis','b_trans','a_yr','g_0','g_1','sigma_yr','w','sigma_v')
-inits<- function() {list(b_0=runif(1,-1,1), b_juld=runif(1,-1,1), b_temp=runif(1,-1,1), b_temp2=runif(1,-1,1), b_dis=runif(1,-1,1), b_trans=runif(1,-1,1), g_0=runif(1,0.5,1), g_1=runif(1,0,0.1), sigma_yr=runif(1,0,2), w=rbinom(1,0,1), sigma_v=runif(1,0,2) )}
+parameters <- c('b_0','b_juld','b_temp','b_ftt','b_txf','b_dis','b_trans','a_yr','sigma_yr','w','mu_v','sigma_v', 'phi_fit')
+inits<- function() {list(b_0=runif(1,-1,1), b_juld=runif(1,-1,1), b_temp=runif(1,-1,1), b_ftt=runif(1,-1,1), b_txf=runif(1,-1,1), b_dis=runif(1,-1,1), b_trans=runif(1,-1,1), sigma_yr=runif(1,0,2), w=rbinom(1,0,1), mu_v=runif(1,1,8), sigma_v=runif(1,0,2) )}
 
 nc<- 4   ;   ni<- 100   ;   nb<- 0   ;   nt<- 1 # test run
+# nc<- 4   ;   ni<- 2000   ;   nb<- 1000   ;   nt<- 1 # test run2
 # nc<- 4   ;   ni<- 80000   ;   nb<-10000   ;   nt<- 7
 
 imglm_out<- jags(im_data, inits, parameters, "fall_chinooka/fc_im/fc_im_glm.txt", n.thin=nt, n.chains=nc, n.burnin=nb, n.iter=ni, parallel=TRUE)
@@ -247,38 +254,76 @@ print(imglm_out)
 im_sims_fc<- imglm_out$sims.list
 im_rhat_fc<- cbind(unlist(imglm_out$Rhat)[!is.na(unlist(imglm_out$Rhat))], unlist(imglm_out$n.eff)[unlist(imglm_out$n.eff)>1])
 # JAGS results saved as as a big table
-# write.table(im_sims_fc, file='fall_chinooka/fc_im/im_glm_sims.txt')
-# write.table(im_rhat_fc, file='fall_chinooka/fc_im/im_glm_rhat.txt')
+write.table(im_sims_fc, file='fall_chinooka/fc_im/im_glm_sims_fc.txt')
+write.table(im_rhat_fc, file='fall_chinooka/fc_im/im_glm_rhat_fc.txt')
+# ----
+
+im_sims_fc<- read.table('fall_chinooka/fc_im/im_glm_sims_fc.txt')
+im_rhat_fc<- read.table('fall_chinooka/fc_im/im_glm_rhat_fc.txt')
+
+b_0_fc=im_sims_fc$b_0; b_juld_fc=im_sims_fc$b_juld; b_temp_fc=im_sims_fc$b_temp; b_ftt_fc=im_sims_fc$b_ftt; b_txf_fc=im_sims_fc$b_txf; b_dis_fc=im_sims_fc$b_dis; b_trans_fc=im_sims_fc$b_trans; sigma_yr_fc=im_sims_fc$sigma_yr; mu_v_fc=im_sims_fc$mu_v; sigma_v_fc=im_sims_fc$sigma_v; devi_fc=im_sims_fc$deviance
+
+a_yr_fc<- 3:17
+for(i in 1:15){
+  a_yr_fc[i]= im_sims_fc[7+i]
+}
+ayrs_fc<- data.frame(cbind(unlist(a_yr_fc[1]), unlist(a_yr_fc[2]), unlist(a_yr_fc[3]), unlist(a_yr_fc[4]), unlist(a_yr_fc[5]), unlist(a_yr_fc[6]), unlist(a_yr_fc[7]), unlist(a_yr_fc[8]), unlist(a_yr_fc[9]), unlist(a_yr_fc[10]), unlist(a_yr_fc[11]), unlist(a_yr_fc[12]), unlist(a_yr_fc[13]), unlist(a_yr_fc[14]), unlist(a_yr_fc[15]) ))
+
+# output table ----
+outtab_fc<- cbind(b_0_fc, b_juld_fc, b_temp_fc, b_ftt_fc, b_txf_fc, b_dis_fc, b_trans_fc, ayrs_fc[,1], ayrs_fc[,2], ayrs_fc[,3], ayrs_fc[,4], ayrs_fc[,5], ayrs_fc[,6], ayrs_fc[,7], ayrs_fc[,8], ayrs_fc[,9], ayrs_fc[,10], ayrs_fc[,11], ayrs_fc[,12], ayrs_fc[,13], ayrs_fc[,14], ayrs_fc[,15], sigma_yr_fc, mu_v_fc, sigma_v_fc, devi_fc)
+
+im_mean_fc<- cbind(colMeans(outtab_fc))
+im_se_fc<- cbind(apply(outtab_fc, 2, sd))
+im_cri_fc<- apply(outtab_fc, 2, function(x) quantile(x, c(0.025,0.975)))
+
+summ_fc<- data.frame(cbind(round(im_mean_fc,3), round(im_se_fc,3), paste0('(', round(im_cri_fc[1,], 3),', ', round(im_cri_fc[2,], 3),')'), round(im_rhat_fc, 3)))
+row.names(summ_fc)<- c('(Intercept)', 'Arrival Date', 'Temperature', 'Travel Time', 'Temperature$\\cdot$Travel Time', 'Flow', 'Transported','Year 2003','Year 2004','Year 2005','Year 2006','Year 2007','Year 2008','Year 2009','Year 2010','Year 2011','Year 2012','Year 2013','Year 2014','Year 2015','Year 2016','Year 2017', '$\\sigma_{year}$', '$\\mu_{vel}$', '$\\sigma_{vel}$', 'Deviance')
+colnames(summ_fc)<- c('Mean','SD','95% CRI','$\\hat{R}$','Eff size')
+summ_fc
+
+# traceplot ----
+windows(8,9)
+par(mfrow=c(4,2))
+names(outtab_fc)<- c('b0 (Intercept)', 'b Arrival', 'b Temp', 'b Ftt', 'b Temp.Ftt', 'b Flow', 'b Trans', 'Year2003','Year2004','Year2005','Year2006','Year2007','Year2008','Year2009','Year2010','Year2011','Year2012','Year2013','Year2014','Year2015','Year2016','Year2017', 'SigmaYr', 'MuVel', 'SigmaVel', 'Deviance')
+
+# ncol(outtab_fc)
+pn1<- 1:4; pn2<- 5:8; pn3<- 9:12; pn4<- 13:16; pn5<- 17:20; pn6<- 21:24; pn7<- 25:26
+for(i in pn7){
+  plot_pds(outtab_fc[,i], lab=names(outtab_fc)[i], colr='grey70')
+}
 
 
-## upper reaches survivals (under construction)
+
+# simulated ftt vs. observed ftt
+hist(fcs$ftt, breaks=30, freq= F, col=rgb(0,0,0,0.8))
+hist(ftt_sim, breaks=150, freq= F, col=rgb(1,1,1,.5), add= T)
+
+
 # CJS ----
-# cat('
-  model{
+cat('
+model{
   
   for (i in 1:n_ind){
     z[i,1]<- 1
-    for (t in 2:n_occ){
+    for (t in 2:n_occ) {
       z[i,t]~ dbern(phi[i,t-1]* z[i,t-1])
       y[i,t]~ dbern(p[t-1]* z[i,t])
     }
     phi[i,1]<- phi1
-    phi[i,2]<- phi2p3
-    logit(phi[i,3])<- b_0+ b_juld*juld[i]+ b_temp*temp[i]+ w1*b_temp2*temp2[i]+
-      b_dis*dis[i]+ b_trans*trans[i]+ a_yr[yr[i]]
+    logit(phi[i,2])<- b_0+ b_juld*juld[i]+ b_temp*temp[i]+
+      b_dis*dis[i]+ b_trans*trans[i]+ w1*a_yr[yr[i]]
+    logit(phi2_rep[i])<- b_0+ b_juld*juld[i]+ b_temp*temp[i]+
+      b_dis*dis[i]+ b_trans*trans[i]+ w1*a_yr[yr[i]] # posterior predictive
   }
 
   # priors
-  phi1<- dunif(0.5, 1)
-  phi2p3~ dunif(0.5, 1) # phi2*p3
-  p[1]~ dunif(0.5, 1) # p2
-  p[2]<- 1 # p3
-  p[3]~ dunif(0.5, 1) # p4
+  phi1~ dunif(0.5, 1) # s(mcn to ihr) * p(ihr) 
+  p[1]~ dunif(0.5, 1) # p2 or p(ihr)
+  p[2]<- 1 # p3 or p(lgr)
 
   b_0~ dt(0, 0.1, 1)
   b_juld~ dt(0, 0.4, 1)
   b_temp~ dt(0, 0.4, 1)
-  b_temp2~ dt(0, 0.4, 1)
   b_dis~ dt(0, 0.4, 1)
   b_trans~ dt(0, 0.4, 1)
   sigma_yr~ dt(0, 0.444, 1)T(0,5)
@@ -287,12 +332,89 @@ im_rhat_fc<- cbind(unlist(imglm_out$Rhat)[!is.na(unlist(imglm_out$Rhat))], unlis
     a_yr[j]~ dnorm(0, tau_yr)
   }
   w1~ dbern(0.5)
-    
-}', fill=TRUE, file = paste0(wd,'fall_chinooka/fc_im/fc_cjs.txt'))
+
+  # obs and fit
+  obs<- mean(z[,3])
+  fit<- mean(phi2_rep)
+
+}', fill=TRUE, file = paste0(wd,'fall_chinooka/fc_im/fc_ls_cjs.txt'))
 # ----
 
+# run JAGS ----
+require(jagsUI)
+
+cjs_data<- prep_dat(fcs, typ='w/cjs')
+str(cjs_data)
+
+parameters <- c('b_0','b_juld','b_temp','b_dis','b_trans','a_yr','sigma_yr','p','phi1','w1','obs','fit')
+inits<- function() {list(b_0=runif(1,-1,1), b_juld=runif(1,-1,1), b_temp=runif(1,-1,1), b_dis=runif(1,-1,1), b_trans=runif(1,-1,1), sigma_yr=runif(1,0,2), p.1=runif(1,0.5,1), phi1=runif(1,0.5,1), w1=rbinom(1,0,1) )}
+
+# nc<- 4   ;   ni<- 60   ;   nb<- 10   ;   nt<- 1 # test run dis bitch
+nc<- 4   ;   ni<- 80000   ;   nb<-40000   ;   nt<- 4
+
+cjs_out<- jags(cjs_data, inits, parameters, "fall_chinooka/fc_im/fc_ls_cjs.txt", n.thin=nt, n.chains=nc, n.burnin=nb, n.iter=ni, parallel=TRUE)
+# cjs_out<- autojags(cjs_data, inits, parameters, "fall_chinooka/fc_im/fc_ls_cjs.txt", n.thin=nt, n.chains=nc, n.burnin=nb, iter.increment=50, max.iter=100, parallel=TRUE)
+# cjs_out<- update(cjs_out, parameters.to.save=parameters, n.thin=8, n.chains=4, n.iter=8000, parallel=TRUE)
+print(cjs_out)
+
+# trim more data
+# library('coda')
+# b_temp2_nu= cjs_out$sims.list$b_temp2
+# b_temp2_nu<- as.data.frame(cbind(b_temp2_nu[1:5000],b_temp2_nu[5001:10000],
+#   b_temp2_nu[10001:15000],b_temp2_nu[15001:20000]))
+# mcmc_object<- as.mcmc.list(lapply(b_temp2_nu, mcmc))
+# niter(mcmc_object)
+# windowed_object <- window(mcmc_object, start=2501)
+# summary(windowed_object)
+# gelman.diag(windowed_object)
+
+cjs_sims_fc<- cjs_out$sims.list
+cjs_rhat_fc<- cbind(unlist(cjs_out$Rhat)[!is.na(unlist(cjs_out$Rhat))], unlist(cjs_out$n.eff)[unlist(cjs_out$n.eff)>1])
+# JAGS results saved as as a big table
+write.table(cjs_sims_fc, file='fall_chinooka/fc_im/cjs_sims_fc.txt')
+write.table(cjs_rhat_fc, file='fall_chinooka/fc_im/cjs_rhat_fc.txt')
+
+# convert saved cjs results into vectors ----
+cjs_sims_fc<- read.table('fall_chinooka/fc_im/cjs_sims_fc.txt')
+cjs_rhat_fc<- read.table('fall_chinooka/fc_im/cjs_rhat_fc.txt')
+
+b_0_fc=cjs_sims_fc$b_0; b_juld_fc=cjs_sims_fc$b_juld; b_juld2_fc=cjs_sims_fc$b_juld2; b_temp_fc=cjs_sims_fc$b_temp; b_temp2_fc=cjs_sims_fc$b_temp2; b_dis_fc=cjs_sims_fc$b_dis; b_trans_fc=cjs_sims_fc$b_trans; sigma_yr_fc=cjs_sims_fc$sigma_yr; ihr_p_fc=cjs_sims_fc$p.1; mcn_phi_fc=cjs_sims_fc$phi1; w1_fc=cjs_sims_fc$w1; w2_fc=cjs_sims_fc$w2; phi2_fit_fc=cjs_sims_fc$fit; devi_fc=cjs_sims_fc$deviance
+
+a_yr_fc<- 3:17
+for(i in 1:15){
+  a_yr_fc[i]= cjs_sims_fc[7+i]
+}
+ayrs_fc<- data.frame(cbind(unlist(a_yr_fc[1]), unlist(a_yr_fc[2]), unlist(a_yr_fc[3]), unlist(a_yr_fc[4]), unlist(a_yr_fc[5]), unlist(a_yr_fc[6]), unlist(a_yr_fc[7]), unlist(a_yr_fc[8]), unlist(a_yr_fc[9]), unlist(a_yr_fc[10]), unlist(a_yr_fc[11]), unlist(a_yr_fc[12]), unlist(a_yr_fc[13]), unlist(a_yr_fc[14]), unlist(a_yr_fc[15]) ))
+
+# output table ----
+outtab_fc<- cbind(b_0_fc, b_juld_fc, b_juld2_fc, b_temp_fc, b_temp2_fc, b_dis_fc, b_trans_fc, ayrs_fc[,1], ayrs_fc[,2], ayrs_fc[,3], ayrs_fc[,4], ayrs_fc[,5], ayrs_fc[,6], ayrs_fc[,7], ayrs_fc[,8], ayrs_fc[,9], ayrs_fc[,10], ayrs_fc[,11], ayrs_fc[,12], ayrs_fc[,13], ayrs_fc[,14], ayrs_fc[,15], sigma_yr_fc, ihr_p_fc, mcn_phi_fc, w1_fc, w2_fc, phi2_fit_fc, devi_fc)
+cjs_mean_fc<- cbind(colMeans(outtab_fc))
+cjs_se_fc<- cbind(apply(outtab_fc, 2, sd))
+cjs_cri_fc<- apply(outtab_fc, 2, function(x) quantile(x, c(0.025,0.975)))
+
+summ_fc<- data.frame(cbind(round(cjs_mean_fc,3), round(cjs_se_fc,3), paste0('(', round(cjs_cri_fc[1,], 3),', ', round(cjs_cri_fc[2,], 3),')'), round(cjs_rhat_fc, 3)))
+row.names(summ_fc)<- c('(Intercept)', 'Arrival Date', 'Arrival2', 'Temperature', 'Temperature2', 'Flow', 'Transported','Year 2003','Year 2004','Year 2005','Year 2006','Year 2007','Year 2008','Year 2009','Year 2010','Year 2011','Year 2012','Year 2013','Year 2014','Year 2015','Year 2016','Year 2017', '$\\sigma_{year}$', 'Detection (IHR)', 'Survival (McN)', 'w1', 'w2', '$\\phi_2$fit', 'Deviance')
+colnames(summ_fc)<- c('Mean','SD','95% CRI','$\\hat{R}$','Eff size')
+summ_fc
+
+# traceplot ----
+windows(8,9)
+par(mfrow=c(4,2))
+names(outtab_fc)<- c('b0 (Intercept)', 'b Arrival', 'b Arrival2', 'b Temp', 'b Temp2', 'b Flow', 'b Trans', 'Year2003','Year2004','Year2005','Year2006','Year2007','Year2008','Year2009','Year2010','Year2011','Year2012','Year2013','Year2014','Year2015','Year2016','Year2017', 'SigmaYr', 'IHR Detect', 'McN Survival', 'W1', 'w2', 'Phi2 Fit', 'Deviance')
+
+# ncol(outtab_fc)
+pn1<- 1:4; pn2<- 5:8; pn3<- 9:12; pn4<- 13:16; pn5<- 17:20; pn6<- 21:24; pn7<- 25:28; pn8<- 29
+for(i in pn1){
+  plot_pds(outtab_fc[,i], lab=names(outtab_fc)[i], colr='grey70')
+}
 
 
+# posterior predictive check ----
+phi2_obs_fc= cjs_sim_fc$obs
+mean(phi2_fit_fc > phi2_obs_fc)
+with(cjs_out$sims.list, hist(fit, xlab="Predicted Phi2*p3",
+  breaks=30, xlim=c(0.92,0.97)))
+with(cjs_out$sims.list, abline(v=phi2_obs_fc[1], lwd=2, col="red")) 
 
 
 

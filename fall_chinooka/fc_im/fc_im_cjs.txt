@@ -1,0 +1,46 @@
+
+model{
+
+  for (i in 1:n_ind){
+    # CJS
+    phi[i,1]<- g_0*exp(- g_1*ftt[i])
+    phi[i,2]<- phi2p3
+    
+    z[i,1]<- 1
+    for (t in 2:n_occ){
+      z[i,t]~ dbern(phi[i,t-1]* z[i,t-1])
+      y[i,t]~ dbern(p[t-1]* z[i,t])
+    }
+    
+    # FTT
+    # ftt[i]<- 236/vel[i] # bon-mcn
+    ftt[i]<- 304/vel[i] # bon-ihr
+    vel[i]~ dnorm(mu[i], 0.01)T(0,)
+    mu[i]<- b_0+ b_juld*juld[i]+ b_temp*temp[i]+ w*b_temp2*temp2[i]+
+      b_dis*dis[i]+ b_trans*trans[i]+ a_yr[yr[i]]
+    # mu[i]<- b_0+ b_juld*juld[i]+ b_temp*temp[i]+
+    # b_dis*dis[i]+ b_trans*trans[i]+ a_yr[yr[i]]
+  }
+  
+  # priors
+  # CJS
+  phi2p3~ dunif(0.5, 1)
+  p[1]~ dunif(0.5, 1)
+  p[2]<- 1
+  g_0~ dunif(0.5, 1)
+  g_1~ dunif(0, 0.2)
+  # FTT
+  b_0~ dt(0, 0.1, 1)
+  b_juld~ dt(0, 0.4, 1)
+  b_temp~ dt(0, 0.4, 1)
+  b_temp2~ dt(0, 0.4, 1)
+  b_dis~ dt(0, 0.4, 1)
+  b_trans~ dt(0, 0.4, 1)
+  for (j in 1:15){
+    a_yr[j]~ dnorm(0, tau_yr)
+  }
+  sigma_yr~ dt(0, 0.444, 1)T(0,5)
+  tau_yr<- pow(sigma_yr, -2)
+  w~ dbern(0.5)
+
+}

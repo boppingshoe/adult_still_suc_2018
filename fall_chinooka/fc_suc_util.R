@@ -2,41 +2,59 @@
 # functions for fall chinooka analysis (mar 2018)
 
 fc_load_dat<- function(wd){
-  load(file=paste0(wd, "data_compile/fc_data/fcdat.Rdata"))
-  fcs<- subset(fcdat, esu=='Snake') # limit comparison of transport to snake fish
+  load(file=paste0(wd, "data_compile/fc_data/fclsdat.Rdata"))
+  fcs<- subset(fclsdat, esu=='Snake') # limit comparison of transport to snake fish
   
   # fcs$ftt<- with(fcs, as.numeric(mca_obs- boa_obs))
-  fcs$ftt<- with(fcs, as.numeric(iha_obs- boa_obs))
+  fcs$ftt<- with(fcs, as.numeric(gra_obs- mca_obs))
   fcs<- fcs[fcs$ftt>0|is.na(fcs$ftt),]
   
-  # fcs$vel<- 236/(fcs$ftt) # distance/day (bon-mcn)
+  # fcs$vel<- 236/(fcs$ftt) # distance/day (bon-mcn=236, bon-ihr=304)
   # fcs$mca_det<- ifelse(is.na(fcs$mca_obs), 0, 1)
   # fcs$upp_det<- ifelse(!is.na(fcs$iha_obs), 1,
   #   ifelse(is.na(fcs$gra_obs), 0, 1))
   
-  fcs$vel<- 304/(fcs$ftt) # distance/day (bon-ihr)
-  fcs$low_det<- ifelse(!is.na(fcs$mca_obs), 1,
-    ifelse(is.na(fcs$iha_obs), 0, 1))
+  fcs$vel<- 225/(fcs$ftt) # distance/day (mcn-lgr 522+173- 470)
+  # fcs$low_det<- ifelse(!is.na(fcs$mca_obs), 1,
+  #   ifelse(is.na(fcs$iha_obs), 0, 1))
+  fcs$iha_det<- ifelse(is.na(fcs$iha_obs), 0, 1)
   fcs$gra_det<- ifelse(is.na(fcs$gra_obs), 0, 1)
-  fcs$tempbin<- cut(fcs$temp, breaks = c(7,17:24))
-  fcs$tempbin2<- cut(fcs$temp, breaks = seq(7,24, by=1))
-  
-  fcs$temp_sca<- scale(fcs$temp)
-  fcs$jul_sca<- scale(fcs$boa_jul)
-  fcs$dis_sca<- scale(fcs$dis)
-  fcs$temp2<- scale(fcs$temp^2)
-  fcs$jul2<- scale(fcs$boa_jul^2)
-  fcs$dis2<- scale(fcs$dis^2)
-  fcs<- fcs[!is.na(fcs$temp),]
+
+  fcs$temp_sca<- scale(fcs$ihr_temp)
+  fcs$jul_sca<- scale(fcs$mca_jul)
+  fcs$dis_sca<- scale(fcs$ihr_dis)
+  fcs$temp2<- scale(fcs$ihr_temp^2)
+  fcs$jul2<- scale(fcs$mca_jul^2)
+  fcs$dis2<- scale(fcs$ihr_dis^2)
+  fcs<- fcs[!is.na(fcs$ihr_temp),]
   
   return(fcs)
 }
 
-tempScale<- function(x) (x-mean(fcs$temp))/sd(fcs$temp)
-tempScale2<- function(x) (x-mean(fcs$temp^2))/sd(fcs$temp^2)
+tempScale<- function(x) (x- mean(fcs$ihr_temp))/ sd(fcs$ihr_temp)
+tempScale2<- function(x) (x- mean(fcs$ihr_temp^2))/ sd(fcs$ihr_temp^2)
 
-julScale<- function(x) (x-mean(fcs$boa_jul))/sd(fcs$boa_jul)
-julScale2<- function(x) (x-mean(fcs$boa_jul^2))/sd(fcs$boa_jul^2)
+julScale<- function(x) (x- mean(fcs$mca_jul))/ sd(fcs$mca_jul)
+julScale2<- function(x) (x- mean(fcs$mca_jul^2))/ sd(fcs$mca_jul^2)
+
+vif_mer <- function (fit) {
+  ## adapted from rms::vif
+  
+  v <- vcov(fit)
+  nam <- names(fixef(fit))
+  
+  ## exclude intercepts
+  ns <- sum(1 * (nam == "Intercept" | nam == "(Intercept)"))
+  if (ns > 0) {
+    v <- v[-(1:ns), -(1:ns), drop = FALSE]
+    nam <- nam[-(1:ns)]
+  }
+  
+  d <- diag(v)^0.5
+  v <- diag(solve(v/(d %o% d)))
+  names(v) <- nam
+  v
+}
 
 # CJS stuff
 known_state_cjs<- function(ch){
@@ -65,29 +83,27 @@ cjs_init_z<- function(ch){
 
 prep_dat<- function(fcs, typ='w/cjs'){
   n_ind<- nrow(fcs)
-  juld<- fcs$jul_sca
-  temp<- fcs$temp_sca
-  juld2<- scale(fcs$boa_jul^2)
-  temp2<- scale(fcs$temp^2)
-  dis<- fcs$dis_sca
+  juld<- as.vector(fcs$jul_sca)
+  temp<- as.vector(fcs$temp_sca)
+  juld2<- as.vector(scale(fcs$mca_jul^2))
+  temp2<- as.vector(scale(fcs$ihr_temp^2))
+  dis<- as.vector(fcs$dis_sca)
   trans<- ifelse(fcs$mig_his=='trans', 1, 0)
   yr<- fcs$boa_yr-2002
   # ftt<- fcs$ftt
   vel<- fcs$vel
-  below20<- ifelse(fcs$temp<20, 1, 0)
-  above21<- ifelse(fcs$temp>21, 1, 0)
   if(typ=='w/cjs') {
     # CH<- with(fcs, cbind(rep(1,nrow(fcs)), mca_det, upp_det))
-    CH<- with(fcs, cbind(rep(1,nrow(fcs)), low_det, gra_det))
+    CH<- with(fcs, cbind(rep(1,nrow(fcs)), iha_det, gra_det))
     n_occ<- ncol(CH)
     out_dat<- list(y=CH, n_occ=n_occ, n_ind=n_ind, z=known_state_cjs(CH),
       juld=juld, temp=temp, dis=dis, trans=trans,
       yr=yr, vel=vel, juld2=juld2, temp2=temp2)
   } else {
-    det<- fcs$mca_det
+    det<- fcs$gra_det
     out_dat<- list(det=det, n_ind=n_ind,
       juld=juld, temp=temp, dis=dis, trans=trans,
-      yr=yr, vel=vel, juld2=juld2, temp2=temp2)
+      yr=yr, vel=vel)#, juld2=juld2, temp2=temp2)
   }
   
   return(out_dat)
@@ -106,7 +122,9 @@ plot_pds<- function(pd, lab, nc=4, brks=50, colr=1){
   hist(pd, breaks=brks, col=colr, freq=FALSE, xlab=NA, main=NA)
 }
 
-# plot results
+
+
+# plot results (intergrated model)
 # surv vs. ftt
 surv_ftt<- function(g, lcol='grey50', lw=1, alpha=3, omega=70){
   curve(exp(-(g[1]+ g[2]*x) ),

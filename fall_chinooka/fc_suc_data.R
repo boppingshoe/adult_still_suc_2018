@@ -380,7 +380,7 @@ tdls<- td[[5]]
 tdls <- tdls[order(tdls$date),]
 names(tdls)[1]<- 'obs_date'
 
-save(tdls, file=paste0(wd, "data_compile/fc_data/low_snake_temp_2003_2018.Rdata"))
+save(tdls, file=paste0(wd, "data_compile/low_snake_temp_2003_2018.Rdata"))
 # ----
 
 
@@ -426,7 +426,7 @@ fdls<- fd[[3]]
 fdls <- fdls[order(fdls$date),]
 names(fdls)[1]<- 'obs_date'
 
-save(fdls, file=paste0(wd, "data_compile/fc_data/low_snake_flow_2003_2018.Rdata"))
+save(fdls, file=paste0(wd, "data_compile/low_snake_flow_2003_2018.Rdata"))
 # ----
 
 
@@ -435,13 +435,23 @@ rm(list=ls())
 wd<- 'G:/STAFF/Bobby/css/adult_still_suc_2018/'
 
 load(file=paste0(wd, "data_compile/fc_data/fc1.Rdata")) # fishy data
-fcls<- subset(fc1, !is.na(mca_obs))
+fcls<- subset(fc1, !is.na(mca_obs)) # start at mcn
 fcls$obs_date<- as.Date(fcls$mca_obs)
-load(file=paste0(wd, 'data_compile/fc_data/low_snake_temp_2003_2018.Rdata')) # temper
-load(file=paste0(wd, "data_compile/fc_data/low_snake_flow_2003_2018.Rdata")) # flow
+load(file=paste0(wd, 'data_compile/low_snake_temp_2003_2018.Rdata')) # temper
+load(file=paste0(wd, "data_compile/low_snake_flow_2003_2018.Rdata")) # flow
 
 fclsdat<- merge(fcls, tdls, by='obs_date')
 fclsdat<- merge(fclsdat, fdls, by='obs_date')
+fclsdat[4468:4482, 'mcn_temp']<- 18.135 # replace NA with average beteen 9/30 and 10/3
+fclsdat[4508:4511, 'mcn_temp']<- 16.325 # replace NA with average beteen 10/10 and 10/14
+fclsdat[36:47, 'ihr_temp']<- fclsdat[36:47, 'mcn_temp'] # replace weird mcn_temp with ihr_ temp
+# plot(fclsdat$lgr_temp, fclsdat$mcn_temp, xlim=c(0,30), ylim=c(0,30))
+# plot(fclsdat$mcn_temp, fclsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))
+# plot(fclsdat$lgr_temp, fclsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))
+# LGR temp is messed up
+# with(fclsdat, plot(mca_jul, mcn_temp, pch=20, cex=2, col=mig_yr, ylim=c(8, 23)))
+# with(fclsdat, plot(mca_jul, ihr_temp, pch=20, cex=2, col=mig_yr, ylim=c(8, 23)))
+# with(fclsdat, plot(mca_jul, lgr_temp, pch=20, cex=2, col=mig_yr, ylim=c(8, 23)))
 
 save(fclsdat, file=paste0(wd, "data_compile/fc_data/fclsdat.Rdata"))
 
