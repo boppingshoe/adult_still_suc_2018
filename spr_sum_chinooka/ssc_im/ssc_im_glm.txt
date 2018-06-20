@@ -6,8 +6,6 @@ model{
     det[i]~ dbern(phi[i])
     logit(phi[i])<- b_0+ b_run*summer[i]+ b_temp*temp[i]+ b_temp2*temp2[i]+
       b_ftt*ftt[i]+ b_dis*dis[i]+ b_trans*trans[i]+ a_yr[yr[i]]
-    logit(phi_rep[i])<- b_0+ b_run*summer[i]+ b_temp*temp[i]+ b_temp2*temp2[i]+
-      b_ftt*ftt[i]+ b_dis*dis[i]+ b_trans*trans[i]+ a_yr[yr[i]]
 
     # FTT
     ftt[i]<- (225/vel[i]- 8.95)/ 6.36 # scaled ftt 
@@ -33,8 +31,5 @@ model{
   mu_v~ dt(0, 0.1, 1)T(0,)
   sigma_v~ dt(0, 0.444, 1)T(0,15)
   tau_v<- pow(sigma_v, -2)
-
-  # posterior predictive check
-  phi_fit<- mean(phi_rep)
 
 }

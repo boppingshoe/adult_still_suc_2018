@@ -53,8 +53,8 @@ parameters <- c('b_0','b_run','b_temp','b_temp2','b_ftt','b_dis','b_trans','a_yr
 inits<- function() {list(b_0=runif(1,-1,1), b_run=runif(1,-1,1), b_temp=runif(1,-1,1), b_temp2=runif(1,-1,1), b_ftt=runif(1,-1,1), b_dis=runif(1,-1,1), b_trans=runif(1,-1,1), sigma_yr=runif(1,0,2), mu_v=runif(1,1,8), sigma_v=runif(1,0,2) )}
 
 # nc<- 4   ;   ni<- 100   ;   nb<- 0   ;   nt<- 1 # test run
-nc<- 4   ;   ni<- 1000   ;   nb<- 500   ;   nt<- 1 # test run2
-# nc<- 4   ;   ni<- 20000   ;   nb<-10000   ;   nt<- 2
+# nc<- 4   ;   ni<- 1000   ;   nb<- 500   ;   nt<- 1 # test run2
+nc<- 4   ;   ni<- 20000   ;   nb<-10000   ;   nt<- 2
 
 imglm_out<- jags(im_data, inits, parameters, "spr_sum_chinooka/ssc_im/ssc_im_glm.txt", n.thin=nt, n.chains=nc, n.burnin=nb, n.iter=ni, parallel=TRUE)
 # im_out<- autojags(im_data, inits, parameters, "fall_chinooka/fc_im/fc_im.txt", n.thin=nt, n.chains=nc, n.burnin=2000, iter.increment=5000, max.iter=42000, parallel=TRUE)
@@ -135,7 +135,7 @@ for (i in 1:100){
 mean(m, na.rm=TRUE)
 m
 
-# posterior predictive ----
+# posterior predictive (i don't think this fairly assess travel time in the model) ----
 sscs$summer<- im_data$summer
 sscs$ftt_pre<- sscs$ftt
 sscs[is.na(sscs$ftt), c('ftt_pre')]<- 225/rnorm(sum(is.na(sscs$ftt)), 31.182, 12.385)
@@ -167,8 +167,11 @@ abline(v=0.94, lwd=3, col='red')
 
 # plotting survival relationships ----
 pn<- nrow(outtab_ssc)
-nsim<- 500
+nsim<- 1000
 r<- sample(1:pn, nsim)
+windows(10,4)
+par(mfrow=c(1,2))
+par(mar=c(5,4,2,2)+0.1) # original 5,4,4,2
 # with temperature ----
 # quantile(sscs$ihr_temp, c(0.025,0.975), na.rm=TRUE)
 plot(0,0, xlim=c(8,22), ylim=c(0,1), ty='n',
@@ -188,8 +191,8 @@ invisible(apply(outtab_ssc[r, c('b_0_ssc','b_temp2_ssc','b_ftt_ssc','b_trans_ssc
 invisible(apply(rbind(colMeans(outtab_ssc[r, c('b_0_ssc','b_temp2_ssc','b_ftt_ssc','b_trans_ssc')])), 1, function(x) surv_ftt(x, lcol=c('grey60','grey70'), lw=3)))
 invisible(apply(outtab_ssc[r, c('b_0_ssc','b_temp2_ssc','b_ftt_ssc','b_trans_ssc')], 1, function(x) surv_ftt(x, alpha=4, omega=27)))
 invisible(apply(rbind(colMeans(outtab_ssc[r, c('b_0_ssc','b_temp2_ssc','b_ftt_ssc','b_trans_ssc')])), 1, function(x) surv_ftt(x, alpha=4, omega=27, lcol=c('navy','deeppink'), lw=3)))
-legend(40, 0.8, c(' ',' '), col=c('cyan','lightpink'), lwd=10, bty='n')
-legend(40, 0.8, c('In-River','Transported'), col=c('navy','deeppink'), lwd=3, bty='n')
+legend(25, 1, c(' ',' '), col=c('cyan','lightpink'), lwd=10, bty='n')
+legend(25, 1, c('In-River','Transported'), col=c('navy','deeppink'), lwd=3, bty='n')
 
 
 
