@@ -35,7 +35,8 @@ tempScale<- function(x) (x- mean(fcs$ihr_temp))/ sd(fcs$ihr_temp)
 tempScale2<- function(x) (x- mean(fcs$ihr_temp^2))/ sd(fcs$ihr_temp^2)
 
 julScale<- function(x) (x- mean(fcs$mca_jul))/ sd(fcs$mca_jul)
-julScale2<- function(x) (x- mean(fcs$mca_jul^2))/ sd(fcs$mca_jul^2)
+
+fttScale<- function(x) (x- 7.88)/ 4.29
 
 vif_mer <- function (fit) {
   ## adapted from rms::vif
@@ -123,24 +124,38 @@ plot_pds<- function(pd, lab, nc=4, brks=50, colr=1){
 }
 
 
+# survival plots
+# surv vs. temp
+surv_temp<- function(b, alpha=13, omega=23, lcol=c('cyan','lightpink'), lw=1){
+  curve(plogis(b[1]+ b[2]*tempScale(x)),
+    alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+ b[2]*tempScale(x)+ b[3]),
+    alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+}
+# surv vs. ftt
+surv_ftt<- function(b, temp=mean(fcs$ihr_temp), alpha=3, omega=50, lcol=c('cyan','lightpink'), lw=1){
+  curve(plogis(b[1]+ b[2]*tempScale(temp)+ b[3]*tempScale(temp)*fttScale(x)+ b[4]*fttScale(x)),
+    alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+ b[2]*tempScale(temp)+ b[3]*tempScale(temp)*fttScale(x)+ b[4]*fttScale(x)+ b[5]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+}
 
 # plot results (intergrated model)
 # surv vs. ftt
-surv_ftt<- function(g, lcol='grey50', lw=1, alpha=3, omega=70){
-  curve(exp(-(g[1]+ g[2]*x) ),
-    alpha, omega, col=lcol, lwd=lw, add=TRUE)
-} 
-# surv vs. temp
-surv_temp<- function(b, lcol=c('cyan','lightpink'), lw=1, alpha=18.62, omega=21.87, sig_v=10){
-  eps_v<- rnorm(1, 0, sig_v)
-  curve(b[1]*exp(-b[2]*(236/(b[3]+ b[4]*tempScale(x)+ b[5]*tempScale2(x^2)+ eps_v))), alpha, omega, col=lcol[1],lwd=lw, add=TRUE)
-  curve(b[1]*exp(-b[2]*(236/(b[3]+ b[4]*tempScale(x)+ b[5]*tempScale2(x^2)+ b[6]+ eps_v))), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
-} 
-# ftt vs. temp (not in use)
-ftt_temp<- function(b, lcol=c('cyan','lightpink'), lw=1, alpha=18.62, omega=21.87){
-  curve(236/(b[1]+ b[2]*tempScale(x)+ b[3]*tempScale2(x^2)), alpha, omega, col=lcol[1],lwd=lw, add=TRUE)
-  curve(236/(b[1]+ b[2]*tempScale(x)+ b[3]*tempScale2(x^2)+ b[4]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
-} 
+# surv_ftt<- function(g, lcol='grey50', lw=1, alpha=3, omega=70){
+#   curve(exp(-(g[1]+ g[2]*x) ),
+#     alpha, omega, col=lcol, lwd=lw, add=TRUE)
+# } 
+# # surv vs. temp
+# surv_temp<- function(b, lcol=c('cyan','lightpink'), lw=1, alpha=18.62, omega=21.87, sig_v=10){
+#   eps_v<- rnorm(1, 0, sig_v)
+#   curve(b[1]*exp(-b[2]*(236/(b[3]+ b[4]*tempScale(x)+ b[5]*tempScale2(x^2)+ eps_v))), alpha, omega, col=lcol[1],lwd=lw, add=TRUE)
+#   curve(b[1]*exp(-b[2]*(236/(b[3]+ b[4]*tempScale(x)+ b[5]*tempScale2(x^2)+ b[6]+ eps_v))), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+# } 
+# # ftt vs. temp (not in use)
+# ftt_temp<- function(b, lcol=c('cyan','lightpink'), lw=1, alpha=18.62, omega=21.87){
+#   curve(236/(b[1]+ b[2]*tempScale(x)+ b[3]*tempScale2(x^2)), alpha, omega, col=lcol[1],lwd=lw, add=TRUE)
+#   curve(236/(b[1]+ b[2]*tempScale(x)+ b[3]*tempScale2(x^2)+ b[4]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+# } 
 
 
 

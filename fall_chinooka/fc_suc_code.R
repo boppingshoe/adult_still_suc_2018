@@ -288,7 +288,7 @@ names(outtab_fc)<- c('b0 (Intercept)', 'b Arrival', 'b Temp', 'b Ftt', 'b Temp.F
 
 # ncol(outtab_fc)
 pn1<- 1:4; pn2<- 5:8; pn3<- 9:12; pn4<- 13:16; pn5<- 17:20; pn6<- 21:24; pn7<- 25:26
-for(i in pn7){
+for(i in pn2){
   plot_pds(outtab_fc[,i], lab=names(outtab_fc)[i], colr='grey70')
 }
 
@@ -297,6 +297,44 @@ for(i in pn7){
 # simulated ftt vs. observed ftt
 hist(fcs$ftt, breaks=30, freq= F, col=rgb(0,0,0,0.8))
 hist(ftt_sim, breaks=150, freq= F, col=rgb(1,1,1,.5), add= T)
+
+
+# plotting survival relationships ----
+pn<- nrow(outtab_fc)
+nsim<- 1000
+r<- sample(1:pn, nsim)
+windows(10,4)
+par(mfrow=c(1,2))
+par(mar=c(5,4,2,2)+0.1) # original 5,4,4,2
+# with temperature ----
+# quantile(sos$ihr_temp, c(0.025,0.975), na.rm=TRUE)
+plot(0,0, xlim=c(13,23), ylim=c(0,1), ty='n',
+  xlab='Temperature (Celsius)', ylab='Conversion')
+invisible(apply(outtab_fc[r, c('b_0_fc','b_temp_fc','b_trans_fc')], 1, function(x) surv_temp(x, lcol=c('grey80','grey90')) ))
+invisible(apply(rbind(colMeans(outtab_fc[r, c('b_0_fc','b_temp_fc','b_trans_fc')])), 1, function(x) surv_temp(x, lcol=c('grey60','grey70'), lw=3)))
+invisible(apply(outtab_fc[r, c('b_0_fc','b_temp_fc','b_trans_fc')], 1, function(x) surv_temp(x, alpha=14, omega=22)))
+invisible(apply(rbind(colMeans(outtab_fc[r, c('b_0_fc','b_temp_fc','b_trans_fc')])), 1, function(x) surv_temp(x, alpha=14, omega=22, lcol=c('navy','deeppink'), lw=3)))
+legend(18, 0.4, c(' ',' '), col=c('cyan','lightpink'), lwd=10, bty='n')
+legend(18, 0.4, c('In-River','Transported'), col=c('navy','deeppink'), lwd=3, bty='n')
+
+# fcs$tempbin<- cut(fcs$ihr_temp, breaks=c(10,15,17,19,21,23))
+# points(seq(15,23, by=2), tapply(fcs$gra_det, fcs$tempbin, mean), pch=20, cex=2)
+
+# with ftt ----
+# quantile(sos$ftt, c(0.025,0.975), na.rm=TRUE)
+plot(0,0, xlim=c(0,50), ylim=c(0,1), ty='n',
+  xlab='Travel Time (Days)', ylab='Conversion')
+invisible(apply(outtab_fc[r, c('b_0_fc','b_temp_fc','b_ftt_fc','b_txf_fc','b_trans_fc')], 1, function(x) surv_ftt(x, lcol=c('grey80','grey90')) ))
+invisible(apply(rbind(colMeans(outtab_fc[r, c('b_0_fc','b_temp_fc','b_ftt_fc','b_txf_fc','b_trans_fc')])), 1, function(x) surv_ftt(x, lcol=c('grey60','grey70'), lw=3)))
+invisible(apply(outtab_fc[r, c('b_0_fc','b_temp_fc','b_ftt_fc','b_txf_fc','b_trans_fc')], 1, function(x) surv_ftt(x, alpha=4, omega=25)))
+invisible(apply(rbind(colMeans(outtab_fc[r, c('b_0_fc','b_temp_fc','b_ftt_fc','b_txf_fc','b_trans_fc')])), 1, function(x) surv_ftt(x, alpha=4, omega=25, lcol=c('navy','deeppink'), lw=3)))
+legend(25, 0.4, c(' ',' '), col=c('cyan','lightpink'), lwd=10, bty='n')
+legend(25, 0.4, c('In-River','Transported'), col=c('navy','deeppink'), lwd=3, bty='n')
+# ----
+
+
+
+
 
 
 # CJS ----
