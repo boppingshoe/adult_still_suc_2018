@@ -180,19 +180,22 @@ invisible(apply(outtab_ssc[r, c('b_0_ssc','b_temp_ssc','b_temp2_ssc','b_trans_ss
 invisible(apply(rbind(colMeans(outtab_ssc[r, c('b_0_ssc','b_temp_ssc','b_temp2_ssc','b_trans_ssc')])), 1, function(x) surv_temp(x, lcol=c('grey60','grey70'), lw=3)))
 invisible(apply(outtab_ssc[r, c('b_0_ssc','b_temp_ssc','b_temp2_ssc','b_trans_ssc')], 1, function(x) surv_temp(x, alpha=9, omega=19)))
 invisible(apply(rbind(colMeans(outtab_ssc[r, c('b_0_ssc','b_temp_ssc','b_temp2_ssc','b_trans_ssc')])), 1, function(x) surv_temp(x, alpha=9, omega=19, lcol=c('navy','deeppink'), lw=3)))
-legend(8, 0.5, c(' ',' '), col=c('cyan','lightpink'), lwd=10, bty='n')
-legend(8, 0.5, c('In-River','Transported'), col=c('navy','deeppink'), lwd=3, bty='n')
+legend(8, 0.4, c(' ',' '), col=c('cyan','lightpink'), lwd=10, bty='n')
+legend(8, 0.4, c('In-River','Transported'), col=c('navy','deeppink'), lwd=3, bty='n')
+
+# sscs$tempbin<- cut(sscs$ihr_temp, breaks=c(5,10,11:14,16,23))
+# points(c(8,10,11,12,13,15,18), tapply(sscs$gra_det, sscs$tempbin, mean), pch=20, cex=1)
 
 # with ftt ----
 # quantile(sscs$ftt, c(0.025,0.975), na.rm=TRUE)
 plot(0,0, xlim=c(3,50), ylim=c(0,1), ty='n',
   xlab='Travel Time (Days)', ylab='Conversion')
-invisible(apply(outtab_ssc[r, c('b_0_ssc','b_temp2_ssc','b_ftt_ssc','b_trans_ssc')], 1, function(x) surv_ftt(x, lcol=c('grey80','grey90')) ))
-invisible(apply(rbind(colMeans(outtab_ssc[r, c('b_0_ssc','b_temp2_ssc','b_ftt_ssc','b_trans_ssc')])), 1, function(x) surv_ftt(x, lcol=c('grey60','grey70'), lw=3)))
-invisible(apply(outtab_ssc[r, c('b_0_ssc','b_temp2_ssc','b_ftt_ssc','b_trans_ssc')], 1, function(x) surv_ftt(x, alpha=4, omega=27)))
-invisible(apply(rbind(colMeans(outtab_ssc[r, c('b_0_ssc','b_temp2_ssc','b_ftt_ssc','b_trans_ssc')])), 1, function(x) surv_ftt(x, alpha=4, omega=27, lcol=c('navy','deeppink'), lw=3)))
-legend(25, 1, c(' ',' '), col=c('cyan','lightpink'), lwd=10, bty='n')
-legend(25, 1, c('In-River','Transported'), col=c('navy','deeppink'), lwd=3, bty='n')
+invisible(apply(outtab_ssc[r, c('b_0_ssc','b_temp_ssc','b_temp2_ssc','b_ftt_ssc','b_trans_ssc')], 1, function(x) surv_ftt(x, lcol=c('grey80','grey90')) ))
+invisible(apply(rbind(colMeans(outtab_ssc[r, c('b_0_ssc','b_temp_ssc','b_temp2_ssc','b_ftt_ssc','b_trans_ssc')])), 1, function(x) surv_ftt(x, lcol=c('grey60','grey70'), lw=3)))
+invisible(apply(outtab_ssc[r, c('b_0_ssc','b_temp_ssc','b_temp2_ssc','b_ftt_ssc','b_trans_ssc')], 1, function(x) surv_ftt(x, alpha=4, omega=27)))
+invisible(apply(rbind(colMeans(outtab_ssc[r, c('b_0_ssc','b_temp_ssc','b_temp2_ssc','b_ftt_ssc','b_trans_ssc')])), 1, function(x) surv_ftt(x, alpha=4, omega=27, lcol=c('navy','deeppink'), lw=3)))
+legend(3, 0.4, c(' ',' '), col=c('cyan','lightpink'), lwd=10, bty='n')
+legend(3, 0.4, c('In-River','Transported'), col=c('navy','deeppink'), lwd=3, bty='n')
 
 
 

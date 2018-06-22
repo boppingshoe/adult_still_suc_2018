@@ -27,7 +27,8 @@ tempScale<- function(x) (x- mean(sscs$ihr_temp))/ sd(sscs$ihr_temp)
 tempScale2<- function(x) (x- mean(sscs$ihr_temp^2))/ sd(sscs$ihr_temp^2)
 
 julScale<- function(x) (x- mean(sscs$mca_jul))/ sd(sscs$mca_jul)
-julScale2<- function(x) (x -mean(sscs$mca_jul^2))/ sd(sscs$mca_jul^2)
+
+fttScale<- function(x) (x- 8.95)/ 6.36
 
 vif_mer <- function (fit) {
   ## adapted from rms::vif
@@ -89,11 +90,10 @@ surv_temp<- function(b, alpha=8, omega=22, lcol=c('cyan','lightpink'), lw=1){
     alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
 } 
 # surv vs. ftt
-surv_ftt<- function(b, alpha=3, omega=50, lcol=c('cyan','lightpink'), lw=1){
-  curve(plogis(b[1]+ b[2]*tempScale2(mean(sscs$ihr_temp)^2)+ b[3]*x), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
-  curve(plogis(b[1]+ b[2]*tempScale2(mean(sscs$ihr_temp)^2)+ b[3]*x+ b[4]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
-} 
-
+surv_ftt<- function(b, temp=mean(sscs$ihr_temp), alpha=3, omega=50, lcol=c('cyan','lightpink'), lw=1){
+  curve(plogis(b[1]+b[2]*tempScale(temp)+ b[3]*tempScale2(temp^2)+ b[4]*fttScale(x)), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+b[2]*tempScale(temp)+ b[3]*tempScale2(temp^2)+ b[4]*fttScale(x)+ b[5]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+}
 
 
 
