@@ -4,12 +4,12 @@ model{
   for (i in 1:n_ind){
     # GLM
     det[i]~ dbern(phi[i])
-    logit(phi[i])<- b_0+ b_temp*temp[i]+ b_temp2*temp2[i]+
+    logit(phi[i])<- b_0+ b_temp*temp[i]+ b_temp2*temp2[i]+ 
       b_ftt*ftt[i]+ b_trans*trans[i]+ a_yr[yr[i]]
 
     # FTT
-    ftt[i]<- (225/vel[i]- 8.37)/ 7.7 # scaled ftt 
     vel[i]~ dnorm(mu_v, tau_v)T(0,)
+    ftt[i]<- (225/vel[i]- 8.37)/ 7.7 # scaled ftt 
   }
 
   # priors
@@ -19,15 +19,15 @@ model{
   b_temp2~ dt(0, 0.4, 1)
   b_ftt~ dt(0, 0.4, 1)
   b_trans~ dt(0, 0.4, 1)
-  for (j in 1:15){
+  for (j in 1:7){
     a_yr[j]~ dnorm(0, tau_yr)
   }
-  sigma_yr~ dt(0, 0.444, 1)T(0,5)
+  sigma_yr~ dt(0, 0.444, 1)T(0,10)
   tau_yr<- pow(sigma_yr, -2)
 
   # FTT
   mu_v~ dt(0, 0.1, 1)T(0,)
-  sigma_v~ dt(0, 0.444, 1)T(0,15)
+  sigma_v~ dt(0, 0.444, 1)T(0,12)
   tau_v<- pow(sigma_v, -2)
 
 }

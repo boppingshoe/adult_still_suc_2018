@@ -11,6 +11,7 @@ so_load_dat<- function(wd){
   sos$vel<- 225/(sos$ftt) # distance/day (mcn-lgr 522+173- 470)
   sos$iha_det<- ifelse(is.na(sos$iha_obs), 0, 1)
   sos$gra_det<- ifelse(is.na(sos$gra_obs), 0, 1)
+  sos$mig_yr<- ifelse(sos$mca_yr<=2010, '<=2010', sos$mca_yr)
 
   sos$temp_sca<- scale(sos$ihr_temp)
   sos$jul_sca<- scale(sos$mca_jul)
@@ -26,8 +27,7 @@ so_load_dat<- function(wd){
 tempScale<- function(x) (x- mean(sos$ihr_temp))/ sd(sos$ihr_temp)
 tempScale2<- function(x) (x- mean(sos$ihr_temp^2))/ sd(sos$ihr_temp^2)
 
-julScale<- function(x) (x- mean(sos$mca_jul))/ sd(sos$mca_jul)
-julScale2<- function(x) (x -mean(sos$mca_jul^2))/ sd(sos$mca_jul^2)
+fttScale<- function(x) (x- 8.37)/ 7.7
 
 vif_mer <- function (fit) {
   ## adapted from rms::vif
@@ -49,14 +49,15 @@ vif_mer <- function (fit) {
 }
 
 # JAGS stuff
-prep_dat<- function(sos){
+prep_dat<- function(sos_in){
+  # sos<- subset(sos_in, mig_yr!='2015')
   n_ind<- nrow(sos)
   juld<- as.vector(sos$jul_sca)
   temp<- as.vector(sos$temp_sca)
   temp2<- as.vector(scale(sos$ihr_temp^2))
   dis<- as.vector(sos$dis_sca)
   trans<- ifelse(sos$mig_his=='trans', 1, 0)
-  yr<- sos$mca_yr-2002
+  yr<- as.numeric(as.factor(sos$mig_yr))
   vel<- sos$vel
   det<- sos$gra_det
   out_dat<- list(det=det, n_ind=n_ind, juld=juld,
@@ -86,13 +87,13 @@ surv_temp<- function(b, alpha=13, omega=23, lcol=c('cyan','lightpink'), lw=1){
     alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
   curve(plogis(b[1]+ b[2]*tempScale(x)+ b[3]*tempScale2(x^2)+ b[4]),
     alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
-} 
+}
 # surv vs. ftt
-surv_ftt<- function(b, alpha=4, omega=50, lcol=c('cyan','lightpink'), lw=1){
-  curve(plogis(b[1]+ b[2]*tempScale2(mean(sos$ihr_temp)^2)+ b[3]*x), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
-  curve(plogis(b[1]+ b[2]*tempScale2(mean(sos$ihr_temp)^2)+ b[3]*x+ b[4]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
-} 
-
+surv_ftt<- function(b, temp=mean(sos$ihr_temp), alpha=4, omega=50, lcol=c('cyan','lightpink'), lw=1){
+  curve(plogis(b[1]+b[2]*tempScale(temp)+ b[3]*tempScale2(temp^2)+ b[4]*fttScale(x)),
+    alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+b[2]*tempScale(temp)+ b[3]*tempScale2(temp^2)+ b[4]*fttScale(x)+ b[5]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+}
 
 
 
