@@ -14,12 +14,11 @@ model{
     # GLM
     det[i]~ dbern(phi[i])
     logit(phi[i])<- a_yr[yr[i]]+ b_ftt[yr[i]]*ftt[i]+
-      b_temp*temp[i]+ b_temp2*temp2[i]+ b_trans*trans[i] 
+      b_temp*temp[i]+ b_temp2*temp2[i]+ b_trans*trans[i]
 
     # FTT
     vel[i]~ dnorm(mu_v, tau_v)T(0,)
     ftt[i]<- (225/vel[i]- 8.37)/ 7.7 # scaled ftt 
-    # ftt2[i]<- ((225/vel[i])^2- 129.25)/ 602.51 # scaled ftt^2 
   }
 
   for (j in 1:8){

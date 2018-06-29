@@ -32,9 +32,9 @@ fc_load_dat<- function(wd){
 }
 
 tempScale<- function(x) (x- mean(fcs$ihr_temp))/ sd(fcs$ihr_temp)
-tempScale2<- function(x) (x- mean(fcs$ihr_temp^2))/ sd(fcs$ihr_temp^2)
 
 julScale<- function(x) (x- mean(fcs$mca_jul))/ sd(fcs$mca_jul)
+julScale2<- function(x) (x- mean(fcs$mca_jul^2))/ sd(fcs$mca_jul^2)
 
 fttScale<- function(x) (x- 7.88)/ 4.29
 
@@ -104,7 +104,7 @@ prep_dat<- function(fcs, typ='w/cjs'){
     det<- fcs$gra_det
     out_dat<- list(det=det, n_ind=n_ind,
       juld=juld, temp=temp, dis=dis, trans=trans,
-      yr=yr, vel=vel)#, juld2=juld2, temp2=temp2)
+      yr=yr, vel=vel, juld2=juld2)#, temp2=temp2)
   }
   
   return(out_dat)
@@ -125,18 +125,15 @@ plot_pds<- function(pd, lab, nc=4, brks=50, colr=1){
 
 
 # survival plots
-# surv vs. temp
-surv_temp<- function(b, alpha=13, omega=23, lcol=c('cyan','lightpink'), lw=1){
-  curve(plogis(b[1]+ b[2]*tempScale(x)),
-    alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
-  curve(plogis(b[1]+ b[2]*tempScale(x)+ b[3]),
-    alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+# surv vs. temp # temp range 10.97685 22.36957
+surv_temp<- function(b, juld=mean(fcs$mca_jul), alpha=13, omega=23, lcol=c('cyan','lightpink'), lw=1){
+  curve(plogis(b[1]+ b[2]*julScale(juld)+ b[3]*julScale2(juld^2)+ b[4]*tempScale(x)), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+ b[2]*julScale(juld)+ b[3]*julScale2(juld^2)+ b[4]*tempScale(x)+ b[5]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
 }
-# surv vs. ftt
-surv_ftt<- function(b, temp=mean(fcs$ihr_temp), alpha=3, omega=50, lcol=c('cyan','lightpink'), lw=1){
-  curve(plogis(b[1]+ b[2]*tempScale(temp)+ b[3]*tempScale(temp)*fttScale(x)+ b[4]*fttScale(x)),
-    alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
-  curve(plogis(b[1]+ b[2]*tempScale(temp)+ b[3]*tempScale(temp)*fttScale(x)+ b[4]*fttScale(x)+ b[5]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+# surv vs. ftt # ftt range 3.673646 81.597697
+surv_ftt<- function(b, temp=mean(fcs$ihr_temp), alpha=3, omega=50, lcol=c('chartreuse','aquamarine'), lw=1){
+  curve(plogis(b[1]+ b[2]*tempScale(temp)+ b[3]*fttScale(x)+ b[4]*tempScale(temp)*fttScale(x)), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+ b[2]*tempScale(temp+2)+ b[3]*fttScale(x)+ b[4]*tempScale(temp+2)*fttScale(x)), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
 }
 
 # plot results (intergrated model)
