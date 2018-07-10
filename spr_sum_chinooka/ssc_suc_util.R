@@ -25,9 +25,8 @@ ssc_load_dat<- function(wd){
 
 tempScale<- function(x) (x- mean(sscs$ihr_temp))/ sd(sscs$ihr_temp)
 tempScale2<- function(x) (x- mean(sscs$ihr_temp^2))/ sd(sscs$ihr_temp^2)
-
 julScale<- function(x) (x- mean(sscs$mca_jul))/ sd(sscs$mca_jul)
-
+disScale<- function(x) (x- mean(sscs$ihr_dis))/ sd(sscs$ihr_dis)
 fttScale<- function(x) (x- 8.95)/ 6.36
 
 vif_mer <- function (fit) {

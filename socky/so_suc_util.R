@@ -4,6 +4,7 @@
 so_load_dat<- function(wd){
   load(file=paste0(wd, "data_compile/so_data/solsdat.Rdata"))
   sos<- subset(solsdat, esu=='snake') # limit comparison of transport to snake fish
+  sos<- sos[sos$mca_jul<240,]
   
   sos$ftt<- with(sos, as.numeric(gra_obs- mca_obs))
   sos<- sos[(sos$ftt>0& sos$ftt<366)| is.na(sos$ftt),]
@@ -57,7 +58,7 @@ prep_dat<- function(sos_in){
   temp2<- as.vector(scale(sos$ihr_temp^2))
   dis<- as.vector(sos$dis_sca)
   trans<- ifelse(sos$mig_his=='trans', 1, 0)
-  yr<- as.numeric(as.factor(sos$mig_yr))
+  yr<- as.numeric(as.factor(sos$mig_yr)) # NOT mca_yr
   vel<- sos$vel
   det<- sos$gra_det
   out_dat<- list(det=det, n_ind=n_ind, juld=juld,
@@ -82,19 +83,25 @@ plot_pds<- function(pd, lab, nc=4, brks=50, colr=1){
 
 # survival plots
 # surv vs. temp
-surv_temp<- function(b, alpha=13, omega=23, lcol=c('cyan','lightpink'), lw=1){
-  curve(plogis(b[1]+ b[2]*tempScale(x)+ b[3]*tempScale2(x^2)),
+surv_temp_so<- function(b, alpha=13, omega=23, lcol=c('cyan','lightpink'), lw=1){
+  curve(plogis(b[1]+ b[2]*tempScale(x)),
     alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
-  curve(plogis(b[1]+ b[2]*tempScale(x)+ b[3]*tempScale2(x^2)+ b[4]),
+  curve(plogis(b[1]+ b[2]*tempScale(x)+ b[3]),
     alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
 }
 # surv vs. ftt
-surv_ftt<- function(b, temp=mean(sos$ihr_temp), alpha=4, omega=50, lcol=c('cyan','lightpink'), lw=1){
-  curve(plogis(b[1]+b[2]*tempScale(temp)+ b[3]*tempScale2(temp^2)+ b[4]*fttScale(x)),
-    alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
-  curve(plogis(b[1]+b[2]*tempScale(temp)+ b[3]*tempScale2(temp^2)+ b[4]*fttScale(x)+ b[5]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
-}
+# surv_ftt_so<- function(b, temp=mean(sos$ihr_temp), alpha=3, omega=30, lcol=c('chartreuse','aquamarine'), lw=1){
+#   curve(plogis(b[1]+ b[2]*tempScale(temp)+ b[3]*fttScale(x)+ b[4]*tempScale(temp)*fttScale(x)), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
+#   curve(plogis(b[1]+ b[2]*tempScale(temp+2)+ b[3]*fttScale(x)+ b[4]*tempScale(temp+2)*fttScale(x)), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+# }
 
+# no temp x ftt
+surv_ftt_so<- function(b, temp=mean(sos$ihr_temp), alpha=3, omega=30, lcol=c('chartreuse','aquamarine'), lw=1){
+  curve(plogis(b[1]+ b[2]*tempScale(temp)+ b[3]*fttScale(x)),
+    alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+ b[2]*tempScale(temp+2)+ b[3]*fttScale(x)),
+    alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+}
 
 
 

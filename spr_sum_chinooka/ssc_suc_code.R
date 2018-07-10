@@ -15,6 +15,11 @@ model{
     det[i]~ dbern(phi[i])
     logit(phi[i])<- b_0+ b_run*summer[i]+ b_temp*temp[i]+ b_temp2*temp2[i]+
       b_ftt*ftt[i]+ b_dis*dis[i]+ b_trans*trans[i]+ a_yr[yr[i]]
+    r_obs[i]<- det[i]- phi[i]
+    det_rep[i]~ dbern(phi_rep[i])
+    logit(phi_rep[i])<- b_0+ b_run*summer[i]+ b_temp*temp[i]+ b_temp2*temp2[i]+
+      b_ftt*ftt[i]+ b_dis*dis[i]+ b_trans*trans[i]+ a_yr[yr[i]]
+    r_rep[i]<- det_rep[i]- phi_rep[i]
 
     # FTT
     ftt[i]<- (225/vel[i]- 8.95)/ 6.36 # scaled ftt 
@@ -41,7 +46,11 @@ model{
   sigma_v~ dt(0, 0.444, 1)T(0,15)
   tau_v<- pow(sigma_v, -2)
 
-}', fill=TRUE, file = paste0(wd,'spr_sum_chinooka/ssc_im/ssc_im_glm.txt'))
+  # posterior predictive
+  t_obs<- sum(r_obs)/n_ind
+  t_rep<- sum(r_rep)/n_ind
+
+}', fill=TRUE, file = paste0(wd,'spr_sum_chinooka/ssc_im/ssc_im_glm3.txt'))
 #####
 require(jagsUI)
 
@@ -49,14 +58,15 @@ im_data<- prep_dat(sscs)
 str(im_data)
 
 # run JAGS ----
-parameters <- c('b_0','b_run','b_temp','b_temp2','b_ftt','b_dis','b_trans','a_yr','sigma_yr','mu_v','sigma_v')
+# parameters <- c('b_0','b_run','b_temp','b_temp2','b_ftt','b_dis','b_trans','a_yr','sigma_yr','mu_v','sigma_v')
+parameters <- c('b_0','b_run','b_temp','b_temp2','b_ftt','b_dis','b_trans','a_yr','sigma_yr','mu_v','sigma_v','t_obs','t_rep')
 inits<- function() {list(b_0=runif(1,-1,1), b_run=runif(1,-1,1), b_temp=runif(1,-1,1), b_temp2=runif(1,-1,1), b_ftt=runif(1,-1,1), b_dis=runif(1,-1,1), b_trans=runif(1,-1,1), sigma_yr=runif(1,0,2), mu_v=runif(1,1,8), sigma_v=runif(1,0,2) )}
 
 # nc<- 4   ;   ni<- 100   ;   nb<- 0   ;   nt<- 1 # test run
 # nc<- 4   ;   ni<- 1000   ;   nb<- 500   ;   nt<- 1 # test run2
 nc<- 4   ;   ni<- 20000   ;   nb<-10000   ;   nt<- 2
 
-imglm_out<- jags(im_data, inits, parameters, "spr_sum_chinooka/ssc_im/ssc_im_glm.txt", n.thin=nt, n.chains=nc, n.burnin=nb, n.iter=ni, parallel=TRUE)
+imglm_out<- jags(im_data, inits, parameters, "spr_sum_chinooka/ssc_im/ssc_im_glm3.txt", n.thin=nt, n.chains=nc, n.burnin=nb, n.iter=ni, parallel=TRUE)
 # im_out<- autojags(im_data, inits, parameters, "fall_chinooka/fc_im/fc_im.txt", n.thin=nt, n.chains=nc, n.burnin=2000, iter.increment=5000, max.iter=42000, parallel=TRUE)
 # imglm_out<- update(imglm_out, parameters.to.save=parameters, n.thin=1, n.chains=4, n.iter=5000, parallel=TRUE)
 print(imglm_out)
@@ -64,14 +74,16 @@ print(imglm_out)
 im_sims_ssc<- imglm_out$sims.list
 im_rhat_ssc<- cbind(unlist(imglm_out$Rhat)[!is.na(unlist(imglm_out$Rhat))], unlist(imglm_out$n.eff)[unlist(imglm_out$n.eff)>1])
 # JAGS results saved as as a big table
-write.table(im_sims_ssc, file='spr_sum_chinooka/ssc_im/im_glm_sims_ssc.txt')
-write.table(im_rhat_ssc, file='spr_sum_chinooka/ssc_im/im_glm_rhat_ssc.txt')
+write.table(im_sims_ssc, file='spr_sum_chinooka/ssc_im/im_glm3_sims_ssc.txt')
+write.table(im_rhat_ssc, file='spr_sum_chinooka/ssc_im/im_glm3_rhat_ssc.txt')
 
 # convert saved JAGS results into vectors ----
-im_sims_ssc<- read.table('spr_sum_chinooka/ssc_im/im_glm_sims_ssc.txt')
-im_rhat_ssc<- read.table('spr_sum_chinooka/ssc_im/im_glm_rhat_ssc.txt')
+im_sims_ssc<- read.table('spr_sum_chinooka/ssc_im/im_glm3_sims_ssc.txt')
+im_rhat_ssc<- read.table('spr_sum_chinooka/ssc_im/im_glm3_rhat_ssc.txt')
 
 b_0_ssc=im_sims_ssc$b_0; b_run_ssc=im_sims_ssc$b_run; b_temp_ssc=im_sims_ssc$b_temp; b_temp2_ssc=im_sims_ssc$b_temp2; b_ftt_ssc=im_sims_ssc$b_ftt; b_dis_ssc=im_sims_ssc$b_dis; b_trans_ssc=im_sims_ssc$b_trans; sigma_yr_ssc=im_sims_ssc$sigma_yr; mu_v_ssc=im_sims_ssc$mu_v; sigma_v_ssc=im_sims_ssc$sigma_v; devi_ssc=im_sims_ssc$deviance
+
+t_obs_ssc=im_sims_ssc$t_obs; t_rep_ssc=im_sims_ssc$t_rep
 
 a_yr_ssc<- 3:17
 for(i in 1:15){
@@ -86,7 +98,7 @@ im_median_ssc<- cbind(apply(outtab_ssc, 2, median))
 im_se_ssc<- cbind(apply(outtab_ssc, 2, sd))
 im_cri_ssc<- apply(outtab_ssc, 2, function(x) quantile(x, c(0.025,0.975)))
 
-summ_ssc<- data.frame(cbind(round(im_median_ssc,3), round(im_se_ssc,3), paste0('(', round(im_cri_ssc[1,], 3),', ', round(im_cri_ssc[2,], 3),')'), round(im_rhat_ssc, 3)))
+summ_ssc<- data.frame(cbind(round(im_median_ssc,3), round(im_se_ssc,3), paste0('(', round(im_cri_ssc[1,], 3),', ', round(im_cri_ssc[2,], 3),')'), round(im_rhat_ssc[-c(26,27),], 3)))
 row.names(summ_ssc)<- c('(Intercept)', 'Summer Run', 'Temperature', 'Temp^2', 'Travel Time', 'Flow', 'Transported','Year 2003','Year 2004','Year 2005','Year 2006','Year 2007','Year 2008','Year 2009','Year 2010','Year 2011','Year 2012','Year 2013','Year 2014','Year 2015','Year 2016','Year 2017', '$\\sigma_{year}$', '$\\mu_{vel}$', '$\\sigma_{vel}$', 'Deviance')
 colnames(summ_ssc)<- c('Median','SD','95% CRI','$\\hat{R}$','Eff size')
 summ_ssc
@@ -250,13 +262,21 @@ par(mfrow=c(1, 2))
 par(oma = c(3, 0, 0, 0))
 par(mar = c(3, 4, 2, 2))
 
-su<- plogis(b_0_ssc+b_run_ssc)- plogis(b_0_ssc)
+# diff between run types
+# set up avg env cond for spring and summer
+mtemp_ssc<- tapply(sscs$ihr_temp, sscs$run, mean)
+mftt_ssc<- tapply(sscs$ftt, sscs$run, function(x) mean(x, na.rm=TRUE))
+mdis_ssc<- tapply(sscs$ihr_dis, sscs$run, mean)
+
+su<- plogis(b_0_ssc+ b_run_ssc+ b_temp_ssc*tempScale(mtemp_ssc[2])+ b_temp2_ssc*tempScale2(mtemp_ssc[2]^2)+ b_ftt_ssc*fttScale(mftt_ssc[2])+ b_dis_ssc*disScale(mdis_ssc[2]))- plogis(b_0_ssc+ b_temp_ssc*tempScale(mtemp_ssc[1])+ b_temp2_ssc*tempScale2(mtemp_ssc[1]^2)+ b_ftt_ssc*fttScale(mftt_ssc[1])+ b_dis_ssc*disScale(mdis_ssc[1]))
+# su<- plogis(b_0_ssc+ b_run_ssc)- plogis(b_0_ssc)
 quantile(su, c(0.025,0.5,0.975))
-su_obs<- mean(sscs[sscs$run=='summer','gra_det'])- mean(sscs[sscs$run=='spring','gra_det'])
-hist(su, breaks=40, main='Run', xlab= NULL, col='grey50', border='white')
+su_obs<- mean(sscs[sscs$run=='summer','gra_det'])-
+  mean(sscs[sscs$run=='spring','gra_det'])
+hist(su, breaks=50, main='Run', xlab= NULL, col='grey50', border='white')
 abline(v=su_obs, col='red', lwd=3)
 
-
+# diff between transport
 tr<- plogis(b_0_ssc)- plogis(b_0_ssc+b_trans_ssc)
 tr_obs<- mean(sscs[sscs$mig_his=='river','gra_det'])- mean(sscs[sscs$mig_his=='trans','gra_det'])
 hist(tr, breaks=30, main='Migration History', xlab= NULL, col='grey50', border='white')

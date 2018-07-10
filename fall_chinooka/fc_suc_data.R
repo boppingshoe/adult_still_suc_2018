@@ -444,7 +444,7 @@ fclsdat<- merge(fcls, tdls, by='obs_date')
 fclsdat<- merge(fclsdat, fdls, by='obs_date')
 fclsdat[4468:4482, 'mcn_temp']<- 18.135 # replace NA with average beteen 9/30 and 10/3
 fclsdat[4508:4511, 'mcn_temp']<- 16.325 # replace NA with average beteen 10/10 and 10/14
-fclsdat[36:47, 'ihr_temp']<- fclsdat[36:47, 'mcn_temp'] # replace weird mcn_temp with ihr_ temp
+fclsdat[36:47, 'ihr_temp']<- fclsdat[36:47, 'mcn_temp'] # replace weird ihr_temp with mcn_ temp
 # plot(fclsdat$lgr_temp, fclsdat$mcn_temp, xlim=c(0,30), ylim=c(0,30))
 # plot(fclsdat$mcn_temp, fclsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))
 # plot(fclsdat$lgr_temp, fclsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))

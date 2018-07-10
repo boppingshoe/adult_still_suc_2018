@@ -1,0 +1,50 @@
+
+model{
+  
+  for (i in 1:n_ind){
+    # GLM
+    # det[i]~ dbern(phi[i])
+    det[i]~ dbern(phi_bound[i])
+    phi_bound[i]<- max(0.0000000001, min(0.9999999999, phi[i]))
+    logit(phi[i])<- b_0+ b_juld*juld[i]+ b_juld2*juld2[i]+
+      b_temp*temp[i]+ w1*b_temp2*temp2[i]+
+      b_ftt*ftt[i]+ w2*b_txf*temp[i]*ftt[i]+ w2*b_t2xf*temp2[i]*ftt[i]+
+      b_trans*trans[i]
+    r_obs[i]<- det[i]- phi[i]
+    det_rep[i]~ dbern(pr_bound[i])
+    pr_bound[i]<- max(0.0000000001, min(0.9999999999, phi_rep[i]))
+    logit(phi_rep[i])<- b_0+ b_juld*juld[i]+ b_juld2*juld2[i]+
+      b_temp*temp[i]+ w1*b_temp2*temp2[i]+
+      b_ftt*ftt[i]+ w2*b_txf*temp[i]*ftt[i]+ w2*b_t2xf*temp2[i]*ftt[i]+
+      b_trans*trans[i]
+    r_rep[i]<- det_rep[i]- phi_rep[i]
+
+    # FTT
+    ftt[i]<- (225/vel[i]- 23.04)/ 35.04 # scaled ftt 
+    vel[i]~ dnorm(mu_v, tau_v)T(0,)
+  }
+
+  # priors
+  # GLM
+  b_0~ dt(0, 0.1, 1)
+  b_juld~ dt(0, 0.4, 1)
+  b_juld2~ dt(0, 0.4, 1)
+  b_temp~ dt(0, 0.4, 1)
+  b_trans~ dt(0, 0.4, 1)
+  b_ftt~ dt(0, 0.4, 1)
+  w2~ dbern(0.5)
+  b_txf~ dt(0, 0.4, 1)
+  w1~ dbern(0.5)
+  b_temp2~ dt(0, 0.4, 1)
+  b_t2xf~ dt(0, 0.4, 1)
+
+  # FTT
+  mu_v~ dt(0, 0.1, 1)T(0,)
+  sigma_v~ dt(0, 0.444, 1)T(0,)
+  tau_v<- pow(sigma_v, -2)
+
+  # posterior predictive
+  t_obs<- sum(r_obs)/n_ind
+  t_rep<- sum(r_rep)/n_ind
+
+}
