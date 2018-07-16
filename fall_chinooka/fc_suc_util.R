@@ -1,25 +1,18 @@
 
 # functions for fall chinooka analysis (mar 2018)
 
-fc_load_dat<- function(wd){
+load_dat_fc<- function(wd){
   load(file=paste0(wd, "data_compile/fc_data/fclsdat.Rdata"))
   fcs<- subset(fclsdat, esu=='Snake') # limit comparison of transport to snake fish
   
-  # fcs$ftt<- with(fcs, as.numeric(mca_obs- boa_obs))
   fcs$ftt<- with(fcs, as.numeric(gra_obs- mca_obs))
   fcs<- fcs[fcs$ftt>0|is.na(fcs$ftt),]
   
-  # fcs$vel<- 236/(fcs$ftt) # distance/day (bon-mcn=236, bon-ihr=304)
-  # fcs$mca_det<- ifelse(is.na(fcs$mca_obs), 0, 1)
-  # fcs$upp_det<- ifelse(!is.na(fcs$iha_obs), 1,
-  #   ifelse(is.na(fcs$gra_obs), 0, 1))
-  
   fcs$vel<- 225/(fcs$ftt) # distance/day (mcn-lgr 522+173- 470)
-  # fcs$low_det<- ifelse(!is.na(fcs$mca_obs), 1,
-  #   ifelse(is.na(fcs$iha_obs), 0, 1))
   fcs$iha_det<- ifelse(is.na(fcs$iha_obs), 0, 1)
   fcs$gra_det<- ifelse(is.na(fcs$gra_obs), 0, 1)
 
+  fcs$ftt_sca<- scale(fcs$ftt)
   fcs$temp_sca<- scale(fcs$ihr_temp)
   fcs$jul_sca<- scale(fcs$mca_jul)
   fcs$dis_sca<- scale(fcs$ihr_dis)
@@ -57,56 +50,34 @@ vif_mer <- function (fit) {
   v
 }
 
-# CJS stuff
-known_state_cjs<- function(ch){
-  state<- ch
-  for (i in 1:dim(ch)[1]){
-    n1<- min(which(ch[i,]==1))
-    n2<- max(which(ch[i,]==1))
-    state[i,n1:n2]<- 1
-    state[i,n1]<- NA
-  }
-  state[state==0]<- NA
-  return(state)
-}
+# JAGS stuff
+prep_dat_fc<- function(fcs, typ='stan'){
+  fcs<- fcs[order(fcs$ftt),]
 
-cjs_init_z<- function(ch){
-  for(i in 1:dim(ch)[1]){
-    if(sum(ch[i,])==1) next
-    n2<- max(which(ch[i,]==1))
-    ch[i,1:n2]<- NA
-  }
-  for (i in 1:dim(ch)[1]){
-    ch[i,1]<- NA
-  }
-  return(ch)
-}
-
-prep_dat<- function(fcs, typ='w/cjs'){
-  n_ind<- nrow(fcs)
   juld<- as.vector(fcs$jul_sca)
   temp<- as.vector(fcs$temp_sca)
   juld2<- as.vector(scale(fcs$mca_jul^2))
-  temp2<- as.vector(scale(fcs$ihr_temp^2))
-  dis<- as.vector(fcs$dis_sca)
+  # temp2<- as.vector(scale(fcs$ihr_temp^2))
+  # dis<- as.vector(fcs$dis_sca)
   trans<- ifelse(fcs$mig_his=='trans', 1, 0)
-  yr<- fcs$boa_yr-2002
-  # ftt<- fcs$ftt
+  # yr<- fcs$boa_yr-2002
   vel<- fcs$vel
-  if(typ=='w/cjs') {
-    # CH<- with(fcs, cbind(rep(1,nrow(fcs)), mca_det, upp_det))
-    CH<- with(fcs, cbind(rep(1,nrow(fcs)), iha_det, gra_det))
-    n_occ<- ncol(CH)
-    out_dat<- list(y=CH, n_occ=n_occ, n_ind=n_ind, z=known_state_cjs(CH),
-      juld=juld, temp=temp, dis=dis, trans=trans,
-      yr=yr, vel=vel, juld2=juld2, temp2=temp2)
+  det<- fcs$gra_det
+  if(typ=='stan') {
+    N<- nrow(fcs)
+    n_obs<- sum(!is.na(fcs$ftt))
+    n_mis<- N- n_obs
+    vel_obs<- fcs[1:n_obs,]$vel
+    ftt_obs<- as.vector(fcs[1:n_obs,]$ftt_sca)
+    out_dat<- list(N=N, n_obs=n_obs, n_mis=n_mis,
+      juld=juld, juld2=juld2, temp=temp, vel_obs=vel_obs,
+      ftt_obs=ftt_obs, trans=trans, det=det)
   } else {
-    det<- fcs$gra_det
+    n_ind<- nrow(fcs)
     out_dat<- list(det=det, n_ind=n_ind,
-      juld=juld, temp=temp, dis=dis, trans=trans,
-      yr=yr, vel=vel, juld2=juld2)#, temp2=temp2)
+      juld=juld, juld2=juld2, temp=temp,
+      vel=vel, trans=trans)
   }
-  
   return(out_dat)
 }
 # traceplot

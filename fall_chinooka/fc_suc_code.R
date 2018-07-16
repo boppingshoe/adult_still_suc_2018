@@ -3,7 +3,7 @@
 rm(list=ls())
 wd<- 'G:/STAFF/Bobby/css/adult_still_suc_2018/'
 source(file=paste0(wd, "fall_chinooka/fc_suc_util.R")) # where the functions are
-fcs<- fc_load_dat(wd)
+fcs<- load_dat_fc(wd)
 #
 
 ## low snake survivals vs. temperature
@@ -13,14 +13,15 @@ model{
   
   for (i in 1:n_ind){
     # GLM
-    # det[i]~ dbern(phi[i])
-    det[i]~ dbern(phi_bound[i])
-    phi_bound[i]<- max(0.0000000001, min(0.9999999999, phi[i]))
+    det[i]~ dbern(phi[i])
+    # det[i]~ dbern(phi_bound[i])
+    # phi_bound[i]<- max(0.0000000001, min(0.9999999999, phi[i]))
     logit(phi[i])<- b_0+ b_juld*juld[i]+ b_juld2*juld2[i]+ b_temp*temp[i]+
       b_ftt*ftt[i]+ b_txf*temp[i]*ftt[i]+ b_trans*trans[i]
     r_obs[i]<- det[i]- phi[i]
-    det_rep[i]~ dbern(pr_bound[i])
-    pr_bound[i]<- max(0.0000000001, min(0.9999999999, phi_rep[i]))
+    det_rep[i]~ dbern(phi_rep[i])
+    # det_rep[i]~ dbern(pr_bound[i])
+    # pr_bound[i]<- max(0.0000000001, min(0.9999999999, phi_rep[i]))
     logit(phi_rep[i])<- b_0+ b_juld*juld[i]+ b_juld2*juld2[i]+ b_temp*temp[i]+
       b_ftt*ftt[i]+ b_txf*temp[i]*ftt[i]+ b_trans*trans[i]
     r_rep[i]<- det_rep[i]- phi_rep[i]
@@ -53,15 +54,16 @@ model{
 #####
 require(jagsUI)
 
-im_data<- prep_dat(fcs, typ='glm')
+im_data<- prep_dat_fc(fcs, typ='jags')
 str(im_data)
 
 # run JAGS ----
 parameters <- c('b_0','b_juld','b_juld2','b_temp','b_ftt','b_txf','b_trans','mu_v','sigma_v','t_obs','t_rep')
-inits<- function() {list(b_0=runif(1,-1,1), b_juld=runif(1,-1,1), b_juld2=runif(1,-1,1), b_temp=runif(1,-1,1), b_ftt=runif(1,-1,1), b_txf=runif(1,-1,1), b_trans=runif(1,-1,1), mu_v=runif(1,1,8), sigma_v=runif(1,0,2) )}
+# inits<- function() {list(b_0=runif(1,-1,1), b_juld=runif(1,-1,1), b_juld2=runif(1,-1,1), b_temp=runif(1,-1,1), b_ftt=runif(1,-1,1), b_txf=runif(1,-1,1), b_trans=runif(1,-1,1), mu_v=runif(1,1,8), sigma_v=runif(1,0,2) )}
+inits<- function() {list(b_0=4, b_juld=6, b_juld2=-6, b_temp=runif(1,-1,1), b_ftt=runif(1,1,2), b_txf=runif(1,0,1), b_trans=runif(1,-2,1), mu_v=33, sigma_v=10 )}
 
 # nc<- 4   ;   ni<- 100   ;   nb<- 0   ;   nt<- 1 # test run
-# nc<- 4   ;   ni<- 1000   ;   nb<- 500   ;   nt<- 1 # test run2
+nc<- 4   ;   ni<- 1000   ;   nb<- 500   ;   nt<- 1 # test run2
 # nc<- 4   ;   ni<- 30000   ;   nb<-20000   ;   nt<- 2 # 6 hrs
 nc<- 4   ;   ni<- 80000   ;   nb<-50000   ;   nt<- 3
 
@@ -77,14 +79,13 @@ im_rhat_fc<- cbind(unlist(imglm_out$Rhat)[!is.na(unlist(imglm_out$Rhat))], unlis
 # write.table(im_rhat_fc, file='fall_chinooka/fc_im/im_glm2_rhat_fc.txt')
 # save(imglm_out, file='fall_chinooka/fc_im/im_glm_out.R')
 # load(file='fall_chinooka/fc_im/im_glm_out.R')
-#####
 
 # convert output ----
 im_sims_fc<- read.table('fall_chinooka/fc_im/im_glm2_sims_fc.txt')
 im_rhat_fc<- read.table('fall_chinooka/fc_im/im_glm2_rhat_fc.txt')
 
 b_0_fc=im_sims_fc$b_0; b_juld_fc=im_sims_fc$b_juld; b_juld2_fc=im_sims_fc$b_juld2; b_temp_fc=im_sims_fc$b_temp; b_ftt_fc=im_sims_fc$b_ftt; b_txf_fc=im_sims_fc$b_txf; b_trans_fc=im_sims_fc$b_trans; mu_v_fc=im_sims_fc$mu_v; sigma_v_fc=im_sims_fc$sigma_v; devi_fc=im_sims_fc$deviance
-t_obs_so=im_sims_fc$t_obs; t_rep_so=im_sims_fc$t_rep
+t_obs_fc=im_sims_fc$t_obs; t_rep_fc=im_sims_fc$t_rep
 
 outtab_fc<- cbind(b_0_fc, b_juld_fc, b_juld2_fc, b_temp_fc, b_ftt_fc, b_txf_fc, b_trans_fc, mu_v_fc, sigma_v_fc, devi_fc)
 
@@ -141,8 +142,7 @@ invisible(apply(outtab_fc[r, c('b_0_fc','b_temp_fc','b_ftt_fc','b_txf_fc','b_tra
 invisible(apply(rbind(colMeans(outtab_fc[r, c('b_0_fc','b_temp_fc','b_ftt_fc','b_txf_fc','b_trans_fc')])), 1, function(x) surv_ftt(x, temp=19, alpha=4, omega=18, lcol=c('olivedrab','turquoise4'), lw=3)))
 legend(15, 0.4, c(' ',' '), col=c('chartreuse','aquamarine'), lwd=10, bty='n')
 legend(15, 0.4, c('19C','21C'), col=c('olivedrab','turquoise4'), lwd=3, bty='n')
-# ----
-
+#####
 # mcnary passage and temp ----
 plot(fcs$mca_jul, fcs$ihr_temp/735, pch=19, cex=0.5, ylim=c(0,0.04))
 hist(fcs$mca_jul, breaks=30, freq=FALSE, add=TRUE, col=rgb(0,0,0,0.5))
@@ -173,9 +173,207 @@ AIC(m4,m8)
 # df      AIC
 # m4  6 5453.255
 # m8  5 5451.964
-# ----
+#####
 
 
+# same shit in Stan
+rm(list=ls())
+wd<- 'G:/STAFF/Bobby/css/adult_still_suc_2018/'
+source(file=paste0(wd, "fall_chinooka/fc_suc_util.R")) # where the functions are
+fcs<- load_dat_fc(wd)
+#
+# stan model ----
+cat("
+  data {
+    int<lower=0> n_obs;
+    int<lower=0> n_mis;
+    int<lower=0> N;
+    int<lower=0, upper=1> det[N];
+    real juld[N];
+    real juld2[N];
+    real temp[N];
+    real<lower=0> vel_obs[n_obs];
+    real ftt_obs[n_obs];
+    vector<lower=0, upper=1>[N] trans;
+  }
+  
+  parameters{
+    real b_0;
+    real b_juld;
+    real b_juld2;
+    real b_temp;
+    real b_ftt;
+    real b_txf;
+    real b_trans;
+    
+    real<lower=0> mu_v;
+    real<lower=0> sigma_v;
+    
+    real<lower=0> vel_mis[n_mis];
+  }
+  
+  transformed parameters{
+    vector<lower=0, upper=1>[N] phi;
+    real ftt_mis[n_mis];
+    for (i in 1:n_obs)
+      phi[i]= inv_logit(b_0+ b_juld*juld[i]+ b_juld2*juld2[i]+
+        b_temp*temp[i]+ b_ftt*ftt_obs[i]+ b_txf*temp[i]*ftt_obs[i]+
+        b_trans*trans[i]);
+    for (j in (n_obs+1):N) {
+      ftt_mis[j-n_obs]= (225/vel_mis[j-n_obs]- 7.88)/ 4.29;
+      phi[j]= inv_logit(b_0+ b_juld*juld[j]+ b_juld2*juld2[j]+
+        b_temp*temp[j]+ b_ftt*ftt_mis[j-n_obs]+ b_txf*temp[j]*ftt_mis[j-n_obs]+
+        b_trans*trans[j]);
+    }
+  }
+  
+  model{
+    // GLM
+    b_0~ student_t(1, 0, 10);
+    b_juld~ student_t(1, 0, 2.5);
+    b_juld2~ student_t(1, 0, 2.5);
+    b_temp~ student_t(1, 0, 2.5);
+    b_ftt~ student_t(1, 0, 2.5);
+    b_txf~ student_t(1, 0, 2.5);
+    b_trans~ student_t(1, 0, 2.5);
+
+    det~ bernoulli(phi);
+    
+    // FTT
+    mu_v~ student_t(1, 0, 10);
+    sigma_v~ student_t(1, 0, 2.25);
+    vel_obs~ normal(mu_v, sigma_v);
+    vel_mis~ normal(mu_v, sigma_v);
+  }
+  
+  generated quantities{
+    real<lower=0, upper=1> phi_rep[N];
+    int<lower=0, upper=1> det_rep[N];
+    real r_obs[N];
+    real r_rep[N];
+    real t_obs;
+    real t_rep;
+    
+    for (i in 1:n_obs)
+      phi_rep[i]= inv_logit(b_0+ b_juld*juld[i]+ b_juld2*juld2[i]+
+        b_temp*temp[i]+ b_ftt*ftt_obs[i]+ b_txf*temp[i]*ftt_obs[i]+
+        b_trans*trans[i]);
+    for (j in (n_obs+1):N)
+      phi_rep[j]= inv_logit(b_0+ b_juld*juld[j]+ b_juld2*juld2[j]+
+        b_temp*temp[j]+ b_ftt*ftt_mis[j-n_obs]+ b_txf*temp[j]*ftt_mis[j-n_obs]+
+        b_trans*trans[j]);
+    // posterior predictive
+    for (n in 1:N){
+      det_rep[n]= bernoulli_rng(phi_rep[n]);
+      r_obs[n]= det[n]- phi[n];
+      r_rep[n]= det_rep[n]- phi_rep[n];
+    }
+    t_obs= mean(r_obs);
+    t_rep= mean(r_rep);
+  }
+
+",fill=TRUE, file=paste0(wd, "fall_chinooka/fc_im/in_stan/fc_im_glm.stan"))
+#####
+
+# data
+im_data_s<- prep_dat_fc(fcs)
+str(im_data_s)
+
+require(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+# run stan ----
+# nc<- 4; ni<- 60; nt<- 1 # test run, burn-in 50%
+nc<- 4; ni<- 30000; nt<- 2 # 7.16 hrs
+
+parameters <- c('b_0','b_juld','b_juld2','b_temp','b_ftt','b_txf','b_trans','mu_v','sigma_v','t_obs','t_rep' )
+
+fc_fit<- stan(data=im_data_s, file=paste0(wd, "fall_chinooka/fc_im/in_stan/fc_im_glm.stan"), chains=nc, iter=ni, thin=nt, pars=parameters, include=TRUE)
+
+fit_summ <- summary(fc_fit)
+round(fit_summ$summary, 3)
+
+# steely_sims <- extract(fc_fit)
+# print(names(fc_sims))
+
+df_fc <- as.data.frame(fc_fit)
+dim(df_fc)
+
+save(fc_fit, file=paste0(wd, 'fall_chinooka/fc_im/in_stan/fc_fit.R'))
+write.table(df_fc, file=paste0(wd, 'fall_chinooka/fc_im/in_stan/im_glm_sims_fc.txt'))
+im_rhat_fc<- fit_summ$summary[,9:10]
+write.table(im_rhat_fc, file=paste0(wd, 'fall_chinooka/fc_im/in_stan/im_rhat_fc.txt'))
+
+# convert output ----
+df_fc<- read.table('fall_chinooka/fc_im/in_stan/im_glm_sims_fc.txt')
+
+b_0_fc=df_fc$b_0; b_juld_fc=df_fc$b_juld; b_juld2_fc=df_fc$b_juld2; b_temp_fc=df_fc$b_temp;  b_ftt_fc=df_fc$b_ftt; b_txf_fc=df_fc$b_txf;  b_trans_fc=df_fc$b_trans; sigma_yr_fc=df_fc$sigma_yr; mu_v_fc=df_fc$mu_v; sigma_v_fc=df_fc$sigma_v; lp_fc=df_fc$lp__
+t_obs_fc=df_fc$t_obs; t_rep_fc=df_fc$t_rep
+
+# output table ----
+im_median_fc<- cbind(apply(df_fc, 2, median))
+im_se_fc<- cbind(apply(df_fc, 2, sd))
+im_cri_fc<- apply(df_fc, 2, function(x) quantile(x, c(0.025,0.975)))
+
+summ_fc<- data.frame(cbind(round(im_median_fc,3), round(im_se_fc,3), paste0('(', round(im_cri_fc[1,], 3),', ', round(im_cri_fc[2,], 3),')'), round(im_rhat_fc, 3)))[-c(10,11),]
+row.names(summ_fc)<- c('(Intercept)', 'Arrival Date', 'Arrival^2^', 'Temperature', 'Travel Time', 'TempxFtt', 'Transported', '$\\mu_{vel}$', '$\\sigma_{vel}$', 'lp__')
+colnames(summ_fc)<- c('Median','SD','95% CRI','Eff size','$\\hat{R}$')
+summ_fc
+
+# traceplot ----
+windows(8,9)
+par(mfrow=c(4,2))
+lnames<- c('b0 (Intercept)', 'b Arrival', 'b Arr^2', 'b Temp', 'b Ftt', 'b TempxFtt', 'b Trans', 'MuVel', 'SigmaVel', 't_obs', 't_rep', 'lp__')
+
+# ncol(df_fc)
+pn1<- 1:4; pn2<- 5:8; pn3<- c(9,12)
+for(i in pn1){
+  plot_pds(df_fc[,i], lab=lnames[i], colr='grey70')
+}
+
+# simulated ftt vs. observed ftt ----
+vel_pre<- rnorm(nrow(sts), 33.233, 10.124)
+vel_pre<- vel_pre[vel_pre> 0]
+ftt_pre<- 225/vel_pre
+
+hist(sts$ftt, breaks=100, freq= F, col=rgb(0,0,0,0.8),
+  main='Steelhead', xlab='Days')
+hist(ftt_pre[ftt_pre<800], breaks=80, freq= F, col=rgb(1,1,1,.5), add= T)
+legend(500, 0.04, c('Observed','Predicted'), pch=c(15,0), col=c(1,1), bty='n')
+#####
+
+# plotting survival relationships ----
+pn<- nrow(df_fc)
+nsim<- 1000
+r<- sample(1:pn, nsim)
+windows(10,4)
+par(mfrow=c(1,2))
+par(mar=c(5,4,2,2)+0.1) # original 5,4,4,2
+# with temperature ----
+# quantile(sts$ihr_temp, c(0.025,0.975), na.rm=TRUE) # 17.61250 21.61574
+# quantile(sts$mca_jul, c(0.025,0.975), na.rm=TRUE) # 228 277 (range= 128 to 319)
+plot(0,0, xlim=c(13,23), ylim=c(0,1), ty='n',
+  xlab='Temperature (Celsius)', ylab='Conversion')
+invisible(apply(df_fc[r, c('b_0','b_juld','b_juld2','b_temp','b_trans')], 1, function(x) surv_temp(x, lcol=c('grey90','grey80')) ))
+invisible(apply(rbind(colMeans(df_fc[r, c('b_0','b_juld','b_juld2','b_temp','b_trans')])), 1, function(x) surv_temp(x, lcol=c('grey70','grey60'), lw=3)))
+invisible(apply(df_fc[r, c('b_0','b_juld','b_juld2','b_temp','b_trans')], 1, function(x) surv_temp(x, alpha=17, omega=22)))
+invisible(apply(rbind(colMeans(df_fc[r, c('b_0','b_juld','b_juld2','b_temp','b_trans')])), 1, function(x) surv_temp(x, alpha=17, omega=22, lcol=c('navy','deeppink'), lw=3)))
+legend(18, 0.4, c(' ',' '), col=c('cyan','lightpink'), lwd=10, bty='n')
+legend(18, 0.4, c('In-River','Transported'), col=c('navy','deeppink'), lwd=3, bty='n')
+
+# sts$tempbin<- cut(sts$ihr_temp, breaks=c(10,15,17,19,21,23))
+# points(seq(15,23, by=2), tapply(sts$gra_det, sts$tempbin, mean), pch=20, cex=2)
+
+# with ftt ----
+# quantile(sts$ftt, c(0.025,0.975), na.rm=TRUE) # 4.219896 18.005590
+plot(0,0, xlim=c(3,25), ylim=c(0,1), ty='n',
+  xlab='Travel Time (Days)', ylab='Conversion')
+invisible(apply(df_fc[r, c('b_0','b_temp','b_ftt','b_txf')], 1, function(x) surv_ftt(x, temp=19, lcol=c('grey90','grey80')) ))
+invisible(apply(rbind(colMeans(df_fc[r, c('b_0','b_temp','b_ftt','b_txf')])), 1, function(x) surv_ftt(x, temp=19, lcol=c('grey70','grey60'), lw=3)))
+invisible(apply(df_fc[r, c('b_0','b_temp','b_ftt','b_txf')], 1, function(x) surv_ftt(x, temp=19, alpha=4, omega=18)))
+invisible(apply(rbind(colMeans(df_fc[r, c('b_0','b_temp','b_ftt','b_txf')])), 1, function(x) surv_ftt(x, temp=19, alpha=4, omega=18, lcol=c('olivedrab','turquoise4'), lw=3)))
+legend(15, 0.4, c(' ',' '), col=c('chartreuse','aquamarine'), lwd=10, bty='n')
+legend(15, 0.4, c('19C','21C'), col=c('olivedrab','turquoise4'), lwd=3, bty='n')
 
 
 
