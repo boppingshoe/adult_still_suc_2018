@@ -9,6 +9,7 @@ load_dat_st<- function(wd){
   sts<- sts[sts$ftt>0|is.na(sts$ftt),]
   sts$vel<- 225/(sts$ftt) # distance/day (mcn-lgr 522+173- 470)
   
+  sts$ftt_sca<- scale(sts$ftt)
   sts$temp_sca<- scale(sts$ihr_temp)
   sts$jul_sca<- scale(sts$mca_jul)
   sts$dis_sca<- scale(sts$ihr_dis)
@@ -46,7 +47,7 @@ vif_mer <- function (fit) {
   v
 }
 
-# for JAGS stuff
+# JAGS stuff
 prep_dat<- function(sts){
   n_ind<- nrow(sts)
   juld<- as.vector(sts$jul_sca)
@@ -60,8 +61,8 @@ prep_dat<- function(sts){
   vel<- sts$vel
   det<- sts$gra_det
   out_dat<- list(det=det, n_ind=n_ind,
-    juld=juld, temp=temp, dis=dis, trans=trans,
-    yr=yr, vel=vel, juld2=juld2, temp2=temp2)
+    juld=juld, juld2=juld2, temp=temp, vel=vel,
+    trans=trans, yr=yr)#, dis=dis, temp2=temp2)
 
   return(out_dat)
 }
@@ -79,16 +80,50 @@ plot_pds<- function(pd, lab, nc=4, brks=50, colr=1){
   hist(pd, breaks=brks, col=colr, freq=FALSE, xlab=NA, main=NA)
 }
 
+# Stan stuff
+stan_dat<- function(sts){
+  N<- nrow(sts)
+  n_obs<- sum(!is.na(sts$ftt))
+  n_mis<- N- n_obs
+  sts<- sts[order(sts$ftt),]
+  
+  juld<- as.vector(sts$jul_sca)
+  juld2<- as.vector(scale(sts$mca_jul^2))
+  temp<- as.vector(sts$temp_sca)
+  vel_obs<- sts[1:n_obs,]$vel
+  ftt_obs<- as.vector(sts[1:n_obs,]$ftt_sca)
+  trans<- ifelse(sts$mig_his=='Trans', 1, 0)
+  yr<- sts$mca_yr-2002
+  det<- sts$gra_det
+
+  out_dat<- list(N=N, n_obs=n_obs, n_mis=n_mis,
+    juld=juld, juld2=juld2, temp=temp, vel_obs=vel_obs,
+    ftt_obs=ftt_obs, trans=trans, yr=yr, det=det)
+  
+  return(out_dat)
+}
+
 
 # survival plots
 # surv vs. temp # temp range 10.97685 22.36957
-surv_temp_st<- function(b, juld=mean(sts$mca_jul), alpha=13, omega=23, lcol=c('cyan','lightpink'), lw=1){
-  curve(plogis(b[1]+ b[2]*julScale_st(juld)+ b[3]*julScale2_st(juld^2)+ b[4]*tempScale_st(x)), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
-  curve(plogis(b[1]+ b[2]*julScale_st(juld)+ b[3]*julScale2_st(juld^2)+ b[4]*tempScale_st(x)+ b[5]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+surv_temp_st<- function(b, juld=mean(sts$mca_jul), ftt=median(sts$ftt, na.rm=TRUE), alpha=13, omega=23, lcol=c('cyan','lightpink'), lw=1){
+  curve(plogis(b[1]+ b[2]*julScale_st(juld)+ b[3]*julScale2_st(juld^2)+ b[4]*tempScale_st(x)+ b[5]*fttScale_st(ftt)+ b[6]*fttScale_st(ftt)*tempScale_st(x)), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+ b[2]*julScale_st(juld)+ b[3]*julScale2_st(juld^2)+ b[4]*tempScale_st(x)+ b[5]*fttScale_st(ftt)+ b[6]*fttScale_st(ftt)*tempScale_st(x)+ b[7]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
 }
 # surv vs. ftt # ftt range 3.673646 81.597697
-surv_ftt_st<- function(b, temp=mean(sts$ihr_temp), alpha=3, omega=50, lcol=c('chartreuse','aquamarine'), lw=1){
-  curve(plogis(b[1]+ b[2]*tempScale_st(temp)+ b[3]*fttScale_st(x)+ b[4]*tempScale_st(temp)*fttScale_st(x)), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
-  curve(plogis(b[1]+ b[2]*tempScale_st(temp+2)+ b[3]*fttScale_st(x)+ b[4]*tempScale_st(temp+2)*fttScale_st(x)), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+surv_ftt_st<- function(b, jdlo=mean(sts$mca_jul), jdhi=mean(sts$mca_jul), temp=mean(sts$ihr_temp), alpha=3, omega=50, lcol=c('chartreuse','aquamarine'), lw=1){
+  curve(plogis(b[1]+ b[2]*tempScale_st(temp)+ b[3]*fttScale_st(x)+
+      b[4]*tempScale_st(temp)*fttScale_st(x)+ b[5]*julScale_st(jdlo)+
+      b[6]*julScale2_st(jdlo^2)), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+ b[2]*tempScale_st(temp+2)+ b[3]*fttScale_st(x)+
+      b[4]*tempScale_st(temp+2)*fttScale_st(x)+ b[5]*julScale_st(jdhi)+
+      b[6]*julScale2_st(jdhi^2)), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
 }
+
+
+
+
+
+
+
 

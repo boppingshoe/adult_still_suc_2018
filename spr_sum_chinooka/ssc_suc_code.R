@@ -54,7 +54,7 @@ model{
 #####
 require(jagsUI)
 
-im_data<- prep_dat(sscs)
+im_data<- ssc_prep_dat(sscs, typ='jags')
 str(im_data)
 
 # run JAGS ----
@@ -115,7 +115,7 @@ for(i in pn7){
 }
 #####
 
-# simulated ftt vs. observed ftt ----
+# simulated ftt vs. observed ftt
 # overlapping ----
 vel_pre<- rnorm(nrow(sscs), 31.182, 12.385)
 vel_pre<- vel_pre[vel_pre> 0]
@@ -283,6 +283,144 @@ hist(tr, breaks=30, main='Migration History', xlab= NULL, col='grey50', border='
 abline(v=tr_obs, col='red', lwd=3)
 
 mtext('Difference in Conversion', side=1, outer=TRUE, line=0, cex=1.2)
+#####
+
+# same shit in Stan
+rm(list=ls())
+wd<- 'G:/STAFF/Bobby/css/adult_still_suc_2018/'
+source(file=paste0(wd, "spr_sum_chinooka/ssc_suc_util.R")) # where the functions are
+sscs<- ssc_load_dat(wd)
+#
+# stan model ----
+cat("
+  data {
+    int<lower=0> n_obs;
+    int<lower=0> n_mis;
+    int<lower=0> N;
+    int<lower=0, upper=1> det[N];
+    vector<lower=0, upper=1>[N] summer;
+    real temp[N];
+    real temp2[N];
+    real<lower=0> vel_obs[n_obs];
+    real ftt_obs[n_obs];
+    real dis[N];
+    vector<lower=0, upper=1>[N] trans;
+    int<lower=1, upper=15> yr[N];
+  }
+  
+  parameters{
+    real b_0;
+    real b_run;
+    real b_temp;
+    real b_temp2;
+    real b_ftt;
+    real b_dis;
+    real b_trans;
+    
+    vector[15] a_yr;
+    real<lower=0,upper=5> sigma_yr;
+    real<lower=0> mu_v;
+    real<lower=0> sigma_v;
+    
+    real<lower=0> vel_mis[n_mis];
+  }
+  
+  transformed parameters{
+    vector<lower=0, upper=1>[N] phi;
+    real ftt_mis[n_mis];
+    for (i in 1:n_obs)
+      phi[i]= inv_logit(b_0+ b_run*summer[i]+ b_temp*temp[i]+
+        b_temp2*temp2[i]+ b_ftt*ftt_obs[i]+ b_dis*dis[i]+
+        b_trans*trans[i]+ a_yr[yr[i]]);
+    for (j in (n_obs+1):N) {
+      ftt_mis[j-n_obs]= (225/vel_mis[j-n_obs]- 23.04)/ 35.04;
+      phi[j]= inv_logit(b_0+ b_run*summer[j]+ b_temp*temp[j]+
+        b_temp2*temp2[j]+ b_ftt*ftt_mis[j-n_obs]+ b_dis*dis[j]+
+        b_trans*trans[j]+ a_yr[yr[j]]);
+    }
+  }
+  
+  model{
+  // GLM
+    b_0~ student_t(1, 0, 10);
+    b_run~ student_t(1, 0, 2.5);
+    b_temp~ student_t(1, 0, 2.5);
+    b_temp2~ student_t(1, 0, 2.5);
+    b_ftt~ student_t(1, 0, 2.5);
+    b_dis~ student_t(1, 0, 2.5);
+    b_trans~ student_t(1, 0, 2.5);
+    for(j in 1:15)
+      a_yr[j]~ normal(0, sigma_yr);
+    sigma_yr~ student_t(1, 0, 2.25);
+    
+    det~ bernoulli(phi);
+    
+    // FTT
+    mu_v~ student_t(1, 0, 10);
+    sigma_v~ student_t(1, 0, 2.25);
+    vel_obs~ normal(mu_v, sigma_v);
+    vel_mis~ normal(mu_v, sigma_v);
+  }
+  
+  generated quantities{
+    real<lower=0, upper=1> phi_rep[N];
+    int<lower=0, upper=1> det_rep[N];
+    real r_obs[N];
+    real r_rep[N];
+    real t_obs;
+    real t_rep;
+  
+  for (i in 1:n_obs)
+    phi_rep[i]= inv_logit(b_0+ b_run*summer[i]+ b_temp*temp[i]+
+        b_temp2*temp2[i]+ b_ftt*ftt_obs[i]+ b_dis*dis[i]+
+        b_trans*trans[i]+ a_yr[yr[i]]);
+  for (j in (n_obs+1):N)
+    phi_rep[j]= inv_logit(b_0+ b_run*summer[j]+ b_temp*temp[j]+
+        b_temp2*temp2[j]+ b_ftt*ftt_mis[j-n_obs]+ b_dis*dis[j]+
+        b_trans*trans[j]+ a_yr[yr[j]]);
+  // posterior predictive
+    for (n in 1:N){
+      det_rep[n]= bernoulli_rng(phi_rep[n]);
+      r_obs[n]= det[n]- phi[n];
+      r_rep[n]= det_rep[n]- phi_rep[n];
+    }
+    t_obs= mean(r_obs);
+    t_rep= mean(r_rep);
+  }
+  
+",fill=TRUE, file=paste0(wd, "spr_sum_chinooka/ssc_im/in_stan/ssc_im_glm.stan"))
+#####
+
+# data
+im_data<- ssc_prep_dat(sscs, typ='stan')
+str(im_data)
+
+require(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+# run stan ----
+nc<- 4; ni<- 60; nt<- 1 # test run, burn-in 50%
+# nc<- 4; ni<- 500; nt<- 1
+# nc<- 4; ni<- 5000; nt<- 1
+
+parameters <- c('b_0','b_run','b_temp','b_temp2','b_ftt','b_dis','b_trans','a_yr','sigma_yr','mu_v','sigma_v','t_obs','t_rep' )
+
+ssc_fit<- stan(data=im_data, file=paste0(wd, "spr_sum_chinooka/ssc_im/in_stan/ssc_im_glm.stan"), chains=nc, iter=ni, thin=nt, pars=parameters, include=TRUE)
+
+fit_summ <- summary(ssc_fit)
+round(fit_summ$summary, 3)
+
+# steely_sims <- extract(steely_fit)
+# print(names(steely_sims))
+
+df_steely <- as.data.frame(steely_fit)
+dim(df_steely)
+
+save(steely_fit, file=paste0(wd, 'spr_sum_chinooka/ssc_im/ssc_fit.R'))
+write.table(df_steely, file=paste0(wd, 'spr_sum_chinooka/ssc_im/in_stan/im_glm_sims_ssc.txt'))
+im_rhat_st<- fit_summ$summary[,9:10]
+write.table(im_rhat_st, file=paste0(wd, 'spr_sum_chinooka/ssc_im/in_stan/im_rhat_ssc.txt'))
+#####
 
 
 

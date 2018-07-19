@@ -50,10 +50,10 @@ model{
   t_rep<- sum(r_rep)/n_ind
   
 }', fill=TRUE, file = paste0(wd,'socky/so_im/so_im_glm3.txt'))
-# ----
+#####
 require(jagsUI)
 
-im_data<- prep_dat(sos)
+im_data<- so_prep_dat(sos, typ='jags')
 str(im_data)
 
 # run JAGS ----
@@ -159,197 +159,130 @@ legend(70, 0.15, c('Predicted','Observed'), pch=c(0,15), col=c(1,1), bty='n')
 #####
 
 
-# varying intercept only (glm)
-# convert saved JAGS results into vectors ----
-im_sims_so<- read.table('socky/so_im/im_glm_sims_so.txt')
-im_rhat_so<- read.table('socky/so_im/im_glm_rhat_so.txt')
+# same shit in Stan
+rm(list=ls())
+wd<- 'G:/STAFF/Bobby/css/adult_still_suc_2018/'
+source(file=paste0(wd, "socky/so_suc_util.R")) # where the functions are
+sos<- so_load_dat(wd)
+#
+# stan model ----
+cat("
+  data {
+    int<lower=0> n_obs;
+    int<lower=0> n_mis;
+    int<lower=0> N;
+    int<lower=0, upper=1> det[N];
+    real temp[N];
+    real dis[N];
+    real<lower=0> vel_obs[n_obs];
+    real ftt_obs[n_obs];
+    vector<lower=0, upper=1>[N] trans;
+    int<lower=1, upper=8> yr[N];
+  }
+  
+  parameters {
+    real b_0;
+    real b_temp;
+    real b_dis;
+    real b_ftt;
+    real b_trans;
 
-b_0_so=im_sims_so$b_0; b_temp_so=im_sims_so$b_temp; b_temp2_so=im_sims_so$b_temp2; b_ftt_so=im_sims_so$b_ftt; b_trans_so=im_sims_so$b_trans; sigma_yr_so=im_sims_so$sigma_yr; mu_v_so=im_sims_so$mu_v; sigma_v_so=im_sims_so$sigma_v; devi_so=im_sims_so$deviance
+    vector[8] a_yr;
+    real<lower=0,upper=5> sigma_yr;
+    real<lower=0> mu_v;
+    real<lower=0> sigma_v;
+    
+    real<lower=0> vel_mis[n_mis];
+  }
+  
+  transformed parameters {
+    vector<lower=0, upper=1>[N] phi;
+    real ftt_mis[n_mis];
+    for (i in 1:n_obs)
+      phi[i]= inv_logit(b_0+ b_temp*temp[i]+ b_dis*dis[i]+
+        b_ftt*ftt_obs[i]+ b_trans*trans[i]+ a_yr[yr[i]]);
+    for (j in (n_obs+1):N){
+      ftt_mis[j-n_obs]= (225/vel_mis[j-n_obs]- 8.37)/ 7.7;
+      phi[j]= inv_logit(b_0+ b_temp*temp[j]+ b_dis*dis[j]+
+        b_ftt*ftt_mis[j-n_obs]+ b_trans*trans[j]+ a_yr[yr[j]]);
+    }
+  }
+  
+  model {
+  // GLM
+    b_0~ student_t(1, 0, 10);
+    b_temp~ student_t(1, 0, 2.5);
+    b_dis~ student_t(1, 0, 2.5);
+    b_ftt~ student_t(1, 0, 2.5);
+    b_trans~ student_t(1, 0, 2.5);
+    for(j in 1:8)
+      a_yr[j]~ normal(0, sigma_yr);
+    sigma_yr~ student_t(1, 0, 2.25);
+    
+    det~ bernoulli(phi);
+    
+    // FTT
+    mu_v~ student_t(1, 0, 10);
+    sigma_v~ student_t(1, 0, 2.25);
+    vel_obs~ normal(mu_v, sigma_v);
+    vel_mis~ normal(mu_v, sigma_v);
+  }
+  
+  generated quantities {
+    real<lower=0, upper=1> phi_rep[N];
+    int<lower=0, upper=1> det_rep[N];
+    real r_obs[N];
+    real r_rep[N];
+    real t_obs;
+    real t_rep;
+    
+    for (i in 1:n_obs)
+      phi_rep[i]= inv_logit(b_0+ b_temp*temp[i]+ b_dis*dis[i]+
+        b_ftt*ftt_obs[i]+ b_trans*trans[i]+ a_yr[yr[i]]);
+    for (j in (n_obs+1):N)
+      phi_rep[j]= inv_logit(b_0+ b_temp*temp[j]+ b_dis*dis[j]+
+        b_ftt*ftt_mis[j-n_obs]+ b_trans*trans[j]+ a_yr[yr[j]]);
+    // posterior predictive
+    for (n in 1:N){
+      det_rep[n]= bernoulli_rng(phi_rep[n]);
+      r_obs[n]= det[n]- phi[n];
+      r_rep[n]= det_rep[n]- phi_rep[n];
+    }
+    t_obs= mean(r_obs);
+    t_rep= mean(r_rep);
+  }
 
-a_yr_so<- 1:8
-for(i in 1:8){
-  a_yr_so[i]= im_sims_so[7+i]
-}
-ayrs_so<- data.frame(cbind(unlist(a_yr_so[1]), unlist(a_yr_so[2]), unlist(a_yr_so[3]), unlist(a_yr_so[4]), unlist(a_yr_so[5]), unlist(a_yr_so[6]), unlist(a_yr_so[7]), unlist(a_yr_so[8]) ))
-
-# output table ----
-outtab_so<- cbind(b_0_so, b_temp_so, b_temp2_so, b_ftt_so, b_trans_so, mu_v_so, sigma_v_so, ayrs_so[,1], ayrs_so[,2], ayrs_so[,3], ayrs_so[,4], ayrs_so[,5], ayrs_so[,6], ayrs_so[,7], ayrs_so[,8], sigma_yr_so, devi_so)
-
-im_mean_so<- cbind(colMeans(outtab_so))
-im_se_so<- cbind(apply(outtab_so, 2, sd))
-im_cri_so<- apply(outtab_so, 2, function(x) quantile(x, c(0.025,0.975)))
-
-summ_so<- data.frame(cbind(round(im_mean_so,3), round(im_se_so,3), paste0('(', round(im_cri_so[1,], 3),', ', round(im_cri_so[2,], 3),')'), round(im_rhat_so, 3)))
-row.names(summ_so)<- c('(Intercept)', 'Temperature', 'Temp^2', 'Travel Time', 'Transported', '$\\mu_{vel}$', '$\\sigma_{vel}$','<=Year 2010','Year 2011','Year 2012','Year 2013','Year 2014','Year 2015','Year 2016','Year 2017', '$\\sigma_{year}$', 'Deviance')
-colnames(summ_so)<- c('Mean','SD','95% CRI','$\\hat{R}$','Eff size')
-summ_so
-
-# traceplot ----
-windows(8,9)
-par(mfrow=c(4,2))
-names(outtab_so)<- c('b0 (Intercept)', 'b Temp', 'b Temp^2', 'b Ftt', 'b Trans', 'MuVel', 'SigmaVel','<=Year2010','Year2011','Year2012','Year2013','Year2014','Year2015','Year2016','Year2017', 'SigmaYr', 'Deviance')
-
-# ncol(outtab_so)
-pn1<- 1:4; pn2<- 5:8; pn3<- 9:12; pn4<- 13:16; pn5<- 17
-for(i in pn5){
-  plot_pds(outtab_so[,i], lab=names(outtab_so)[i], colr='grey70')
-}
-# simulated ftt vs. observed ftt ----
-# overlapping
-vel_pre<- rnorm(nrow(sos), xxxx, xxxx)
-vel_pre<- vel_pre[vel_pre> 0]
-ftt_pre<- 225/vel_pre
-
-hist(sos$ftt, breaks=50, freq= F, col=rgb(0,0,0,0.8))
-hist(ftt_pre[ftt_pre<200], breaks=100, freq= F, col=rgb(1,1,1,.5), add= T)
-
-# stacked
-library(plotrix)
-windows()
-par(mfrow=c(2,1))
-hist(sos$ftt, main='Travel Time from Survived Only', xlab='Days',
-  freq=FALSE, breaks=seq(0, ceiling(max(sos$ftt, na.rm=TRUE)), by=1))
-
-hist(ftt_pre[ftt_pre>0], main='Posterior Predicted Travel Time',
-  xlab='Days', freq=FALSE,
-  breaks=seq(0, ceiling(max(ftt_pre)), by=1),
-  xlim=c(0, ceiling(max(sos$ftt, na.rm=TRUE))), xaxt='n')
-axis(1, at= seq(0,ceiling(max(sos$ftt, na.rm=TRUE)), by=10),
-  labels= c(seq(0,ceiling(max(sos$ftt, na.rm=TRUE))-10, by=10),
-    round(max(ftt_pre),-2)))
-axis.break(1,65, style='slash') 
-
-m<- rep(NA, 100)
-for (i in 1:100){
-  m[i]<- mean(sos[ftt_pre>30, ]$gra_det)
-}
-mean(m, na.rm=TRUE)
-m
-
-# posterior predictive (i don't think this fairly assess travel time in the model) ----
-sos$ftt_pre<- sos$ftt
-sos[is.na(sos$ftt), c('ftt_pre')]<- 225/rnorm(sum(is.na(sos$ftt)), xxx, xxx)
-sos$trans<- im_data$trans
-pp_chk<- function(dat){
-  plogis(x[1]+ x[2]*dat[1]+ x[3]*dat[2]+ x[4]*dat[3]+ x[5]*dat[4]+ x[6]*dat[5]+ x[7]*dat[6]+ x[dat[7]-2002+7])
-}
-
-es<- rep(NA, 200)
-for (i in 1:200){
-  x<- outtab_so[i,1:22]
-  s<- apply(subset(sos, , c(jul_sca, temp_sca, temp2, ftt_pre, dis_sca, trans, mca_yr)), 1, pp_chk)
-  es[i]<- mean(s)
-}
-hist(s, breaks=30, xlim=c(0.5,1))
-mean(sos[,'gra_det'])
-abline(v=0.94, lwd=3, col='red')
-
-# plotting survival relationships ----
-pn<- nrow(outtab_so)
-nsim<- 1000
-r<- sample(1:pn, nsim)
-windows(10,4)
-par(mfrow=c(1,2))
-par(mar=c(5,4,2,2)+0.1) # original 5,4,4,2
-# with temperature ----
-# quantile(sos$ihr_temp, c(0.025,0.975), na.rm=TRUE)
-plot(0,0, xlim=c(13,23), ylim=c(0,1), ty='n',
-  xlab='Temperature (Celsius)', ylab='Conversion')
-invisible(apply(outtab_so[r, c('b_0_so','b_temp_so','b_temp2_so','b_trans_so')], 1, function(x) surv_temp(x, lcol=c('grey80','grey90')) ))
-invisible(apply(rbind(colMeans(outtab_so[r, c('b_0_so','b_temp_so','b_temp2_so','b_trans_so')])), 1, function(x) surv_temp(x, lcol=c('grey60','grey70'), lw=3)))
-invisible(apply(outtab_so[r, c('b_0_so','b_temp_so','b_temp2_so','b_trans_so')], 1, function(x) surv_temp(x, alpha=14, omega=22)))
-invisible(apply(rbind(colMeans(outtab_so[r, c('b_0_so','b_temp_so','b_temp2_so','b_trans_so')])), 1, function(x) surv_temp(x, alpha=14, omega=22, lcol=c('navy','deeppink'), lw=3)))
-legend(14, 0.4, c(' ',' '), col=c('cyan','lightpink'), lwd=10, bty='n')
-legend(14, 0.4, c('In-River','Transported'), col=c('navy','deeppink'), lwd=3, bty='n')
-
-# sos$tempbin<- cut(sos$ihr_temp, breaks=c(12,16,18,20,22,23))
-# points(seq(14,22, by=2), tapply(sos$gra_det, sos$tempbin, mean), pch=20, cex=2)
-
-# with ftt ----
-# quantile(sos$ftt, c(0.025,0.975), na.rm=TRUE)
-plot(0,0, xlim=c(0,50), ylim=c(0,1), ty='n',
-  xlab='Travel Time (Days)', ylab='Conversion')
-invisible(apply(outtab_so[r, c('b_0_so','b_temp_so','b_temp2_so','b_ftt_so','b_trans_so')], 1, function(x) surv_ftt(x, lcol=c('grey80','grey90')) ))
-invisible(apply(rbind(colMeans(outtab_so[r, c('b_0_so','b_temp_so','b_temp2_so','b_ftt_so','b_trans_so')])), 1, function(x) surv_ftt(x, lcol=c('grey60','grey70'), lw=3)))
-invisible(apply(outtab_so[r, c('b_0_so','b_temp_so','b_temp2_so','b_ftt_so','b_trans_so')], 1, function(x) surv_ftt(x, alpha=4, omega=25)))
-invisible(apply(rbind(colMeans(outtab_so[r, c('b_0_so','b_temp_so','b_temp2_so','b_ftt_so','b_trans_so')])), 1, function(x) surv_ftt(x, alpha=4, omega=25, lcol=c('navy','deeppink'), lw=3)))
-legend(25, 0.4, c(' ',' '), col=c('cyan','lightpink'), lwd=10, bty='n')
-legend(25, 0.4, c('In-River','Transported'), col=c('navy','deeppink'), lwd=3, bty='n')
+",fill=TRUE, file=paste0(wd, "socky/so_im/in_stan/so_im_glm.stan"))
 #####
 
+# data
+im_data_s<- so_prep_dat(sos, typ='stan')
+str(im_data_s)
 
-# varying intercept and slope (glm2)
-# convert saved JAGS results into vectors ----
-im_sims_so<- read.table('socky/so_im/im_glm2_sims_so.txt')
-im_rhat_so<- read.table('socky/so_im/im_glm2_rhat_so.txt')
+require(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+# run stan ----
+# nc<- 4; ni<- 60; nt<-1 # test run, burn-in 50%
+nc<- 4; ni<- 10000; nt<- 1
 
-b_temp_so=im_sims_so$b_temp; b_temp2_so=im_sims_so$b_temp2; b_trans_so=im_sims_so$b_trans; mu_v_so=im_sims_so$mu_v; sigma_v_so=im_sims_so$sigma_v; sigma_yr_so=im_sims_so$sigma_yr; sigma_ftt_so=im_sims_so$sigma_ftt; devi_so=im_sims_so$deviance
+parameters <- c('b_0','b_temp','b_dis','b_ftt','b_trans','a_yr','sigma_yr','mu_v','sigma_v','t_obs','t_rep' )
 
-a_yr_so<- 1:8
-for(i in 1:8){
-  a_yr_so[i]= im_sims_so[3+i]
-}
-ayrs_so<- data.frame(cbind(unlist(a_yr_so[1]), unlist(a_yr_so[2]), unlist(a_yr_so[3]), unlist(a_yr_so[4]), unlist(a_yr_so[5]), unlist(a_yr_so[6]), unlist(a_yr_so[7]), unlist(a_yr_so[8]) ))
+socky_fit<- stan(data=im_data_s, file=paste0(wd, "socky/so_im/in_stan/so_im_glm.stan"), chains=nc, iter=ni, thin=nt, pars=parameters, include=TRUE)
 
-b_ftt_so<- 1:8
-for(i in 1:8){
-  b_ftt_so[i]= im_sims_so[11+i]
-}
-bftts_so<- data.frame(cbind(unlist(b_ftt_so[1]), unlist(b_ftt_so[2]), unlist(b_ftt_so[3]), unlist(b_ftt_so[4]), unlist(b_ftt_so[5]), unlist(b_ftt_so[6]), unlist(b_ftt_so[7]), unlist(b_ftt_so[8]) ))
+fit_summ <- summary(socky_fit)
+round(fit_summ$summary, 2)
 
-# output table ----
-outtab_so<- cbind(b_temp_so, b_temp2_so, b_trans_so, ayrs_so[,1:8], bftts_so[,1:8], mu_v_so, sigma_v_so, sigma_yr_so, sigma_ftt_so, devi_so)
+df_socky <- as.data.frame(socky_fit)
+dim(df_socky)
 
-im_med_so<- cbind(apply(outtab_so, 2, median))
-im_se_so<- cbind(apply(outtab_so, 2, sd))
-im_cri_so<- apply(outtab_so, 2, function(x) quantile(x, c(0.025,0.975)))
-
-summ_so<- data.frame(cbind(round(im_med_so,3), round(im_se_so,3), paste0('(', round(im_cri_so[1,], 3),', ', round(im_cri_so[2,], 3),')'), round(im_rhat_so, 3)))
-row.names(summ_so)<- c('Temperature', 'Temp^2', 'Transported', '<=Year 2010','Year 2011','Year 2012','Year 2013','Year 2014','Year 2015','Year 2016','Year 2017', 'FTT <=Y2010', 'FTT Y2011','FTT Y2012','FTT Y2013','FTT Y2014','FTT Y2015','FTT Y2016','FTT Y2017', '$\\mu_{vel}$', '$\\sigma_{vel}$', '$\\sigma_{year}$', '$\\sigma_{ftt}$', 'Deviance')
-colnames(summ_so)<- c('Mean','SD','95% CRI','$\\hat{R}$','Eff size')
-summ_so
-
-# traceplot ----
-windows(8,9)
-par(mfrow=c(4,2))
-names(outtab_so)<- c('b Temp', 'b Temp^2', 'b Trans','<=Year2010','Year2011','Year2012','Year2013','Year2014','Year2015','Year2016','Year2017', 'b Ftt<=2010', 'b Ftt2011', 'b Ftt2012', 'b Ftt2013', 'b Ftt2014', 'b Ftt2015', 'b Ftt2016', 'b Ftt2017', 'MuVel', 'SigmaVel', 'SigmaYr', 'SigmaFtt', 'Deviance')
-
-# ncol(outtab_so)
-pn1<- 1:4; pn2<- 5:8; pn3<- 9:12; pn4<- 13:16; pn5<- 17:20; pn6<- 21:24
-for(i in pn1){
-  plot_pds(outtab_so[,i], lab=names(outtab_so)[i], colr='grey70')
-}
-
-# plotting survival relationships ----
-colnames(outtab_so)<- c('b Temp', 'b Temp^2', 'b Trans','<=Year2010','Year2011','Year2012','Year2013','Year2014','Year2015','Year2016','Year2017', 'b Ftt<=2010', 'b Ftt2011', 'b Ftt2012', 'b Ftt2013', 'b Ftt2014', 'b Ftt2015', 'b Ftt2016', 'b Ftt2017', 'MuVel', 'SigmaVel', 'SigmaYr', 'SigmaFtt', 'Deviance')
-pn<- nrow(outtab_so)
-nsim<- 1000
-r<- sample(1:pn, nsim)
-windows(10,4)
-par(mfrow=c(1,2))
-par(mar=c(5,4,2,2)+0.1) # original 5,4,4,2
-# with temperature ----
-# quantile(sos$ihr_temp, c(0.025,0.975), na.rm=TRUE)
-plot(0,0, xlim=c(13,23), ylim=c(0,1), ty='n',
-  xlab='Temperature (Celsius)', ylab='Conversion', main='2016')
-invisible(apply(outtab_so[r, c('Year2016','b Temp','b Temp^2','b Trans')], 1, function(x) surv_temp(x, lcol=c('grey80','grey90')) ))
-invisible(apply(rbind(colMeans(outtab_so[r, c('Year2016','b Temp','b Temp^2','b Trans')])), 1, function(x) surv_temp(x, lcol=c('grey60','grey70'), lw=3)))
-invisible(apply(outtab_so[r, c('Year2016','b Temp','b Temp^2','b Trans')], 1, function(x) surv_temp(x, alpha=14, omega=22)))
-invisible(apply(rbind(colMeans(outtab_so[r, c('Year2016','b Temp','b Temp^2','b Trans')])), 1, function(x) surv_temp(x, alpha=14, omega=22, lcol=c('navy','deeppink'), lw=3)))
-legend(14, 0.4, c(' ',' '), col=c('cyan','lightpink'), lwd=10, bty='n')
-legend(14, 0.4, c('In-River','Transported'), col=c('navy','deeppink'), lwd=3, bty='n')
-
-# with ftt ----
-# quantile(sos$ftt, c(0.025,0.975), na.rm=TRUE)
-plot(0,0, xlim=c(0,50), ylim=c(0,1), ty='n',
-  xlab='Travel Time (Days)', ylab='Conversion', main='2016')
-invisible(apply(outtab_so[r, c('Year2016','b Temp','b Temp^2','b Ftt2016','b Trans')], 1, function(x) surv_ftt(x, lcol=c('grey80','grey90')) ))
-invisible(apply(rbind(colMeans(outtab_so[r, c('Year2016','b Temp','b Temp^2','b Ftt2016','b Trans')])), 1, function(x) surv_ftt(x, lcol=c('grey60','grey70'), lw=3)))
-invisible(apply(outtab_so[r, c('Year2016','b Temp','b Temp^2','b Ftt2016','b Trans')], 1, function(x) surv_ftt(x, alpha=4, omega=25)))
-invisible(apply(rbind(colMeans(outtab_so[r, c('Year2016','b Temp','b Temp^2','b Ftt2016','b Trans')])), 1, function(x) surv_ftt(x, alpha=4, omega=25, lcol=c('navy','deeppink'), lw=3)))
-legend(10, 0.4, c(' ',' '), col=c('cyan','lightpink'), lwd=10, bty='n')
-legend(10, 0.4, c('In-River','Transported'), col=c('navy','deeppink'), lwd=3, bty='n')
+save(socky_fit, file=paste0(wd, 'socky/so_im/in_stan/socky_fit.R'))
+write.table(df_socky, file=paste0(wd, 'socky/so_im/in_stan/im_glm_sims_so.txt'))
+im_rhat_so<- fit_summ$summary[,9:10]
+write.table(im_rhat_so, file=paste0(wd, 'socky/so_im/in_stan/im_rhat_so.txt'))
 #####
+# df_socky<- read.table(paste0(wd, 'socky/so_im/in_stan/im_glm_sims_so.txt')')
+
 
 
 # mcnary passage and temp ----

@@ -12,6 +12,7 @@ ssc_load_dat<- function(wd){
   sscs$iha_det<- ifelse(is.na(sscs$iha_obs), 0, 1)
   sscs$gra_det<- ifelse(is.na(sscs$gra_obs), 0, 1)
 
+  sscs$ftt_sca<- scale(sscs$ftt)
   sscs$temp_sca<- scale(sscs$ihr_temp)
   sscs$jul_sca<- scale(sscs$mca_jul)
   sscs$dis_sca<- scale(sscs$ihr_dis)
@@ -48,21 +49,33 @@ vif_mer <- function (fit) {
   v
 }
 
-# JAGS stuff
-prep_dat<- function(sscs){
-  n_ind<- nrow(sscs)
-  # juld<- as.vector(sscs$jul_sca)
-  summer<- ifelse(sscs$run=='summer', 1, 0)
-  temp<- as.vector(sscs$temp_sca)
-  temp2<- as.vector(scale(sscs$ihr_temp^2))
-  dis<- as.vector(sscs$dis_sca)
-  trans<- ifelse(sscs$mig_his=='trans', 1, 0)
-  yr<- sscs$mca_yr-2002
-  vel<- sscs$vel
-  det<- sscs$gra_det
-  out_dat<- list(det=det, n_ind=n_ind, summer=summer,# juld=juld,
-    temp=temp, temp2=temp2, dis=dis, trans=trans, yr=yr, vel=vel)
-
+# JAGS/Stan stuff
+ssc_prep_dat<- function(dat, typ='stan'){
+  dat<- dat[order(dat$ftt),]
+  
+  summer<- ifelse(dat$run=='summer', 1, 0)
+  temp<- as.vector(dat$temp_sca)
+  temp2<- as.vector(scale(dat$ihr_temp^2))
+  dis<- as.vector(dat$dis_sca)
+  trans<- ifelse(dat$mig_his=='trans', 1, 0)
+  yr<- dat$mca_yr-2002
+  vel<- dat$vel
+  det<- dat$gra_det
+  
+  if(typ=='stan') {
+    N<- nrow(dat)
+    n_obs<- sum(!is.na(dat$ftt))
+    n_mis<- N- n_obs
+    vel_obs<- dat[1:n_obs,]$vel
+    ftt_obs<- as.vector(dat[1:n_obs,]$ftt_sca)
+    out_dat<- list(N=N, n_obs=n_obs, n_mis=n_mis,
+      summer=summer, temp=temp, temp2=temp2, dis=dis,
+      vel_obs=vel_obs, ftt_obs=ftt_obs, trans=trans, yr=yr, det=det)
+  } else {
+    n_ind<- nrow(dat)
+    out_dat<- list(det=det, n_ind=n_ind, summer=summer,
+      temp=temp, temp2=temp2, dis=dis, trans=trans, yr=yr, vel=vel)
+  }
   return(out_dat)
 }
 # traceplot

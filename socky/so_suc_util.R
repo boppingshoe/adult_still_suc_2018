@@ -14,6 +14,7 @@ so_load_dat<- function(wd){
   sos$gra_det<- ifelse(is.na(sos$gra_obs), 0, 1)
   sos$mig_yr<- ifelse(sos$mca_yr<=2010, '<=2010', sos$mca_yr)
 
+  sos$ftt_sca<- scale(sos$ftt)
   sos$temp_sca<- scale(sos$ihr_temp)
   sos$jul_sca<- scale(sos$mca_jul)
   sos$dis_sca<- scale(sos$ihr_dis)
@@ -49,21 +50,31 @@ vif_mer <- function (fit) {
   v
 }
 
-# JAGS stuff
-prep_dat<- function(sos_in){
-  # sos<- subset(sos_in, mig_yr!='2015')
-  n_ind<- nrow(sos)
-  juld<- as.vector(sos$jul_sca)
+# JAGS/Stan stuff
+so_prep_dat<- function(sos_in, typ='stan'){
+  sos<- sos_in[order(sos_in$ftt),]
+
   temp<- as.vector(sos$temp_sca)
-  temp2<- as.vector(scale(sos$ihr_temp^2))
   dis<- as.vector(sos$dis_sca)
   trans<- ifelse(sos$mig_his=='trans', 1, 0)
   yr<- as.numeric(as.factor(sos$mig_yr)) # NOT mca_yr
   vel<- sos$vel
   det<- sos$gra_det
-  out_dat<- list(det=det, n_ind=n_ind, juld=juld,
-    temp=temp, temp2=temp2, dis=dis, trans=trans, yr=yr, vel=vel)
 
+  if(typ=='stan') {
+    N<- nrow(sos)
+    n_obs<- sum(!is.na(sos$ftt))
+    n_mis<- N- n_obs
+    vel_obs<- sos[1:n_obs,]$vel
+    ftt_obs<- as.vector(sos[1:n_obs,]$ftt_sca)
+    out_dat<- list(N=N, n_obs=n_obs, n_mis=n_mis,
+      temp=temp, dis=dis, vel_obs=vel_obs,
+      ftt_obs=ftt_obs, trans=trans, yr=yr, det=det)
+  } else {
+    n_ind<- nrow(sos)
+    out_dat<- list(det=det, n_ind=n_ind,
+      temp=temp, dis=dis, vel=vel, trans=trans, yr=yr)
+  }
   return(out_dat)
 }
 # traceplot
