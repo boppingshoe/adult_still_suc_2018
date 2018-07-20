@@ -59,7 +59,6 @@ ssc_prep_dat<- function(dat, typ='stan'){
   dis<- as.vector(dat$dis_sca)
   trans<- ifelse(dat$mig_his=='trans', 1, 0)
   yr<- dat$mca_yr-2002
-  vel<- dat$vel
   det<- dat$gra_det
   
   if(typ=='stan') {
@@ -72,6 +71,7 @@ ssc_prep_dat<- function(dat, typ='stan'){
       summer=summer, temp=temp, temp2=temp2, dis=dis,
       vel_obs=vel_obs, ftt_obs=ftt_obs, trans=trans, yr=yr, det=det)
   } else {
+    vel<- dat$vel
     n_ind<- nrow(dat)
     out_dat<- list(det=det, n_ind=n_ind, summer=summer,
       temp=temp, temp2=temp2, dis=dis, trans=trans, yr=yr, vel=vel)

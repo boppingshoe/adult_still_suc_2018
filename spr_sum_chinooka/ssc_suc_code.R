@@ -333,7 +333,7 @@ cat("
         b_temp2*temp2[i]+ b_ftt*ftt_obs[i]+ b_dis*dis[i]+
         b_trans*trans[i]+ a_yr[yr[i]]);
     for (j in (n_obs+1):N) {
-      ftt_mis[j-n_obs]= (225/vel_mis[j-n_obs]- 23.04)/ 35.04;
+      ftt_mis[j-n_obs]= (225/vel_mis[j-n_obs]- 8.95)/ 6.36;
       phi[j]= inv_logit(b_0+ b_run*summer[j]+ b_temp*temp[j]+
         b_temp2*temp2[j]+ b_ftt*ftt_mis[j-n_obs]+ b_dis*dis[j]+
         b_trans*trans[j]+ a_yr[yr[j]]);
@@ -399,9 +399,9 @@ require(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 # run stan ----
-nc<- 4; ni<- 60; nt<- 1 # test run, burn-in 50%
-# nc<- 4; ni<- 500; nt<- 1
-# nc<- 4; ni<- 5000; nt<- 1
+# nc<- 4; ni<- 60; nt<- 1 # test run, burn-in 50%
+nc<- 4; ni<- 500; nt<- 1
+nc<- 4; ni<- 5000; nt<- 1
 
 parameters <- c('b_0','b_run','b_temp','b_temp2','b_ftt','b_dis','b_trans','a_yr','sigma_yr','mu_v','sigma_v','t_obs','t_rep' )
 
