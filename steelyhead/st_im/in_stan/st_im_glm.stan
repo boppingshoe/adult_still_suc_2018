@@ -70,10 +70,14 @@
   generated quantities{
     real<lower=0, upper=1> phi_rep[N];
     int<lower=0, upper=1> det_rep[N];
-    real r_obs[N];
-    real r_rep[N];
-    real t_obs;
-    real t_rep;
+    real t_rep[N];
+    real ir_rep[N];
+    real tr_rep[N];
+    real ir_obs[N];
+    real tr_obs[N];
+    real tm_rep;
+    real trm_rep;
+    real trm_obs;
   
     for (i in 1:n_obs)
       phi_rep[i]= inv_logit(b_0+ b_juld*juld[i]+ b_juld2*juld2[i]+
@@ -86,10 +90,16 @@
     // posterior predictive
     for (n in 1:N){
       det_rep[n]= bernoulli_rng(phi_rep[n]);
-      r_obs[n]= det[n]- phi[n];
-      r_rep[n]= det_rep[n]- phi_rep[n];
+      t_rep[n]= det_rep[n]* temp[n];
+        // mig history
+      ir_rep[n]= (trans[n]-1)* (-1)* (det_rep[n]- phi_rep[n]);
+      tr_rep[n]= trans[n]* (det_rep[n]- phi_rep[n]);
+      ir_obs[n]= (trans[n]-1)* (-1)* (det[n]- phi[n]);
+      tr_obs[n]= trans[n]* (det[n]- phi[n]);
     }
-    t_obs= mean(r_obs);
-    t_rep= mean(r_rep);
+    tm_rep= mean(t_rep);
+    trm_rep= sum(ir_rep)/(sum(trans-1)*(-1))- sum(tr_rep)/sum(trans);
+    trm_obs= sum(ir_obs)/(sum(trans-1)*(-1))- sum(tr_obs)/sum(trans);
   }
+
 

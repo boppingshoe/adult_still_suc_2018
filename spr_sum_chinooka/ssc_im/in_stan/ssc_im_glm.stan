@@ -71,27 +71,49 @@
   generated quantities{
     real<lower=0, upper=1> phi_rep[N];
     int<lower=0, upper=1> det_rep[N];
-    real r_obs[N];
-    real r_rep[N];
-    real t_obs;
-    real t_rep;
+    real t_rep[N];
+    real tm_rep;
+    real ir_rep[N];
+    real tr_rep[N];
+    real ir_obs[N];
+    real tr_obs[N];
+    real trm_rep;
+    real trm_obs;
+    real sp_rep[N];
+    real su_rep[N];
+    real sp_obs[N];
+    real su_obs[N];
+    real spm_rep;
+    real spm_obs;
   
-  for (i in 1:n_obs)
-    phi_rep[i]= inv_logit(b_0+ b_run*summer[i]+ b_temp*temp[i]+
-        b_temp2*temp2[i]+ b_ftt*ftt_obs[i]+ b_dis*dis[i]+
-        b_trans*trans[i]+ a_yr[yr[i]]);
-  for (j in (n_obs+1):N)
-    phi_rep[j]= inv_logit(b_0+ b_run*summer[j]+ b_temp*temp[j]+
-        b_temp2*temp2[j]+ b_ftt*ftt_mis[j-n_obs]+ b_dis*dis[j]+
-        b_trans*trans[j]+ a_yr[yr[j]]);
-  // posterior predictive
+    for (i in 1:n_obs)
+      phi_rep[i]= inv_logit(b_0+ b_run*summer[i]+ b_temp*temp[i]+
+          b_temp2*temp2[i]+ b_ftt*ftt_obs[i]+ b_dis*dis[i]+
+          b_trans*trans[i]+ a_yr[yr[i]]);
+    for (j in (n_obs+1):N)
+      phi_rep[j]= inv_logit(b_0+ b_run*summer[j]+ b_temp*temp[j]+
+          b_temp2*temp2[j]+ b_ftt*ftt_mis[j-n_obs]+ b_dis*dis[j]+
+          b_trans*trans[j]+ a_yr[yr[j]]);
+    // posterior predictive
     for (n in 1:N){
       det_rep[n]= bernoulli_rng(phi_rep[n]);
-      r_obs[n]= det[n]- phi[n];
-      r_rep[n]= det_rep[n]- phi_rep[n];
+      t_rep[n]= det_rep[n]* temp[n];
+        // mig history
+      ir_rep[n]= (trans[n]-1)* (-1)* (det_rep[n]- phi_rep[n]);
+      tr_rep[n]= trans[n]* (det_rep[n]- phi_rep[n]);
+      ir_obs[n]= (trans[n]-1)* (-1)* (det[n]- phi[n]);
+      tr_obs[n]= trans[n]* (det[n]- phi[n]);
+        // run type
+      sp_rep[n]= (summer[n]-1)* (-1)* (det_rep[n]- phi_rep[n]);
+      su_rep[n]= summer[n]* (det_rep[n]- phi_rep[n]);
+      sp_obs[n]= (summer[n]-1)* (-1)* (det[n]- phi[n]);
+      su_obs[n]= summer[n]* (det[n]- phi[n]);
     }
-    t_obs= mean(r_obs);
-    t_rep= mean(r_rep);
+    tm_rep= mean(t_rep);
+    trm_rep= sum(ir_rep)/(sum(trans-1)*(-1))- sum(tr_rep)/sum(trans);
+    trm_obs= sum(ir_obs)/(sum(trans-1)*(-1))- sum(tr_obs)/sum(trans);
+    spm_rep= sum(sp_rep)/(sum(summer-1)*(-1))- sum(su_rep)/sum(summer);
+    spm_obs= sum(sp_obs)/(sum(summer-1)*(-1))- sum(su_obs)/sum(summer);
   }
   
 

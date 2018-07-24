@@ -231,10 +231,14 @@ cat("
   generated quantities {
     real<lower=0, upper=1> phi_rep[N];
     int<lower=0, upper=1> det_rep[N];
-    real r_obs[N];
-    real r_rep[N];
-    real t_obs;
-    real t_rep;
+    real t_rep[N];
+    real ir_rep[N];
+    real tr_rep[N];
+    real ir_obs[N];
+    real tr_obs[N];
+    real tm_rep;
+    real trm_rep;
+    real trm_obs;
     
     for (i in 1:n_obs)
       phi_rep[i]= inv_logit(b_0+ b_temp*temp[i]+ b_dis*dis[i]+
@@ -245,11 +249,16 @@ cat("
     // posterior predictive
     for (n in 1:N){
       det_rep[n]= bernoulli_rng(phi_rep[n]);
-      r_obs[n]= det[n]- phi[n];
-      r_rep[n]= det_rep[n]- phi_rep[n];
+      t_rep[n]= det_rep[n]* temp[n];
+        // mig history
+      ir_rep[n]= (trans[n]-1)* (-1)* (det_rep[n]- phi_rep[n]);
+      tr_rep[n]= trans[n]* (det_rep[n]- phi_rep[n]);
+      ir_obs[n]= (trans[n]-1)* (-1)* (det[n]- phi[n]);
+      tr_obs[n]= trans[n]* (det[n]- phi[n]);
     }
-    t_obs= mean(r_obs);
-    t_rep= mean(r_rep);
+    tm_rep= mean(t_rep);
+    trm_rep= sum(ir_rep)/(sum(trans-1)*(-1))- sum(tr_rep)/sum(trans);
+    trm_obs= sum(ir_obs)/(sum(trans-1)*(-1))- sum(tr_obs)/sum(trans);
   }
 
 ",fill=TRUE, file=paste0(wd, "socky/so_im/in_stan/so_im_glm.stan"))
@@ -263,15 +272,17 @@ require(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 # run stan ----
-# nc<- 4; ni<- 60; nt<-1 # test run, burn-in 50%
-nc<- 4; ni<- 10000; nt<- 1
+# nc<- 1; ni<- 60; nt<-1 # test run, burn-in 50%
+# nc<- 4; ni<- 500; nt<- 1
+nc<- 4; ni<- 10000; nt<- 1 # >3 mins
 
-parameters <- c('b_0','b_temp','b_dis','b_ftt','b_trans','a_yr','sigma_yr','mu_v','sigma_v','t_obs','t_rep' )
+# parameters <- c('b_0','b_temp','b_dis','b_ftt','b_trans','a_yr','sigma_yr','mu_v','sigma_v','t_rep','t_obs')
+parameters <- c('b_0','b_temp','b_dis','b_ftt','b_trans','a_yr','sigma_yr','mu_v','sigma_v','tm_rep','trm_rep','trm_obs')
 
 socky_fit<- stan(data=im_data_s, file=paste0(wd, "socky/so_im/in_stan/so_im_glm.stan"), chains=nc, iter=ni, thin=nt, pars=parameters, include=TRUE)
 
 fit_summ <- summary(socky_fit)
-round(fit_summ$summary, 2)
+round(fit_summ$summary, 3)
 
 df_socky <- as.data.frame(socky_fit)
 dim(df_socky)
@@ -281,14 +292,30 @@ write.table(df_socky, file=paste0(wd, 'socky/so_im/in_stan/im_glm_sims_so.txt'))
 im_rhat_so<- fit_summ$summary[,9:10]
 write.table(im_rhat_so, file=paste0(wd, 'socky/so_im/in_stan/im_rhat_so.txt'))
 #####
-# df_socky<- read.table(paste0(wd, 'socky/so_im/in_stan/im_glm_sims_so.txt')')
+# df_socky<- read.table(paste0(wd, 'socky/so_im/in_stan/im_glm_sims_so.txt'))
+plot(df_socky$t_obs, df_socky$t_rep, xlim=c(-0.5,0.2), ylim=c(-0.5,0.2))
+abline(0,1)
+mean(df_socky$t_obs> df_socky$t_rep)
 
+hist(df_socky$tm_rep, breaks=30)
+abline(v=mean(sos$gra_det*sos$temp_sca), lwd=3)
 
+# tr_obs_so<- mean(sos[sos$mig_his=='river','gra_det'])- mean(sos[sos$mig_his=='trans','gra_det'])
+hist(df_socky$trm_rep, breaks=30)
+abline(v=tr_obs_so, lwd=3)
+
+plot(df_socky$trm_obs, df_socky$trm_rep)
+abline(0,1)
+mean(df_socky$trm_obs> df_socky$trm_rep)
+
+#
 
 # mcnary passage and temp ----
 plot(sos$mca_jul, sos$ihr_temp/400, pch=19, cex=0.5, ylim=c(0,0.07))
 hist(sos$mca_jul, breaks=30, freq=FALSE, add=TRUE, col=rgb(0,0,0,0.5))
 abline(h=20/400, lty=2)
+
+
 
 # model selection ----
 m1<- glm(gra_det~ jul_sca+ jul2+ temp_sca+ temp2+ dis_sca+ dis2+ mig_his+ mig_yr, family= binomial, data= sos)

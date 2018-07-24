@@ -365,27 +365,49 @@ cat("
   generated quantities{
     real<lower=0, upper=1> phi_rep[N];
     int<lower=0, upper=1> det_rep[N];
-    real r_obs[N];
-    real r_rep[N];
-    real t_obs;
-    real t_rep;
+    real t_rep[N];
+    real tm_rep;
+    real ir_rep[N];
+    real tr_rep[N];
+    real ir_obs[N];
+    real tr_obs[N];
+    real trm_rep;
+    real trm_obs;
+    real sp_rep[N];
+    real su_rep[N];
+    real sp_obs[N];
+    real su_obs[N];
+    real spm_rep;
+    real spm_obs;
   
-  for (i in 1:n_obs)
-    phi_rep[i]= inv_logit(b_0+ b_run*summer[i]+ b_temp*temp[i]+
-        b_temp2*temp2[i]+ b_ftt*ftt_obs[i]+ b_dis*dis[i]+
-        b_trans*trans[i]+ a_yr[yr[i]]);
-  for (j in (n_obs+1):N)
-    phi_rep[j]= inv_logit(b_0+ b_run*summer[j]+ b_temp*temp[j]+
-        b_temp2*temp2[j]+ b_ftt*ftt_mis[j-n_obs]+ b_dis*dis[j]+
-        b_trans*trans[j]+ a_yr[yr[j]]);
-  // posterior predictive
+    for (i in 1:n_obs)
+      phi_rep[i]= inv_logit(b_0+ b_run*summer[i]+ b_temp*temp[i]+
+          b_temp2*temp2[i]+ b_ftt*ftt_obs[i]+ b_dis*dis[i]+
+          b_trans*trans[i]+ a_yr[yr[i]]);
+    for (j in (n_obs+1):N)
+      phi_rep[j]= inv_logit(b_0+ b_run*summer[j]+ b_temp*temp[j]+
+          b_temp2*temp2[j]+ b_ftt*ftt_mis[j-n_obs]+ b_dis*dis[j]+
+          b_trans*trans[j]+ a_yr[yr[j]]);
+    // posterior predictive
     for (n in 1:N){
       det_rep[n]= bernoulli_rng(phi_rep[n]);
-      r_obs[n]= det[n]- phi[n];
-      r_rep[n]= det_rep[n]- phi_rep[n];
+      t_rep[n]= det_rep[n]* temp[n];
+        // mig history
+      ir_rep[n]= (trans[n]-1)* (-1)* (det_rep[n]- phi_rep[n]);
+      tr_rep[n]= trans[n]* (det_rep[n]- phi_rep[n]);
+      ir_obs[n]= (trans[n]-1)* (-1)* (det[n]- phi[n]);
+      tr_obs[n]= trans[n]* (det[n]- phi[n]);
+        // run type
+      sp_rep[n]= (summer[n]-1)* (-1)* (det_rep[n]- phi_rep[n]);
+      su_rep[n]= summer[n]* (det_rep[n]- phi_rep[n]);
+      sp_obs[n]= (summer[n]-1)* (-1)* (det[n]- phi[n]);
+      su_obs[n]= summer[n]* (det[n]- phi[n]);
     }
-    t_obs= mean(r_obs);
-    t_rep= mean(r_rep);
+    tm_rep= mean(t_rep);
+    trm_rep= sum(ir_rep)/(sum(trans-1)*(-1))- sum(tr_rep)/sum(trans);
+    trm_obs= sum(ir_obs)/(sum(trans-1)*(-1))- sum(tr_obs)/sum(trans);
+    spm_rep= sum(sp_rep)/(sum(summer-1)*(-1))- sum(su_rep)/sum(summer);
+    spm_obs= sum(sp_obs)/(sum(summer-1)*(-1))- sum(su_obs)/sum(summer);
   }
   
 ",fill=TRUE, file=paste0(wd, "spr_sum_chinooka/ssc_im/in_stan/ssc_im_glm.stan"))
@@ -399,11 +421,11 @@ require(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 # run stan ----
-# nc<- 4; ni<- 60; nt<- 1 # test run, burn-in 50%
-nc<- 4; ni<- 500; nt<- 1
-nc<- 4; ni<- 5000; nt<- 1
+# nc<- 1; ni<- 60; nt<- 1 # test run, burn-in 50%
+# nc<- 4; ni<- 500; nt<- 1
+nc<- 4; ni<- 5000; nt<- 1 # 2 hours
 
-parameters <- c('b_0','b_run','b_temp','b_temp2','b_ftt','b_dis','b_trans','a_yr','sigma_yr','mu_v','sigma_v','t_obs','t_rep' )
+parameters <- c('b_0','b_run','b_temp','b_temp2','b_ftt','b_dis','b_trans','a_yr','sigma_yr','mu_v','sigma_v','tm_rep','trm_rep','trm_obs','spm_rep','spm_obs')
 
 ssc_fit<- stan(data=im_data, file=paste0(wd, "spr_sum_chinooka/ssc_im/in_stan/ssc_im_glm.stan"), chains=nc, iter=ni, thin=nt, pars=parameters, include=TRUE)
 
@@ -413,13 +435,13 @@ round(fit_summ$summary, 3)
 # steely_sims <- extract(steely_fit)
 # print(names(steely_sims))
 
-df_steely <- as.data.frame(steely_fit)
-dim(df_steely)
+df_ssc <- as.data.frame(ssc_fit)
+dim(df_ssc)
 
-save(steely_fit, file=paste0(wd, 'spr_sum_chinooka/ssc_im/ssc_fit.R'))
-write.table(df_steely, file=paste0(wd, 'spr_sum_chinooka/ssc_im/in_stan/im_glm_sims_ssc.txt'))
-im_rhat_st<- fit_summ$summary[,9:10]
-write.table(im_rhat_st, file=paste0(wd, 'spr_sum_chinooka/ssc_im/in_stan/im_rhat_ssc.txt'))
+save(ssc_fit, file=paste0(wd, 'spr_sum_chinooka/ssc_im/in_stan/ssc_fit.R'))
+write.table(df_ssc, file=paste0(wd, 'spr_sum_chinooka/ssc_im/in_stan/im_glm_sims_ssc.txt'))
+im_rhat_ssc<- fit_summ$summary[,9:10]
+write.table(im_rhat_ssc, file=paste0(wd, 'spr_sum_chinooka/ssc_im/in_stan/im_rhat_ssc.txt'))
 #####
 
 

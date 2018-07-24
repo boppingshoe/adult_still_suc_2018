@@ -277,10 +277,14 @@ cat("
   generated quantities{
     real<lower=0, upper=1> phi_rep[N];
     int<lower=0, upper=1> det_rep[N];
-    real r_obs[N];
-    real r_rep[N];
-    real t_obs;
-    real t_rep;
+    real t_rep[N];
+    real ir_rep[N];
+    real tr_rep[N];
+    real ir_obs[N];
+    real tr_obs[N];
+    real tm_rep;
+    real trm_rep;
+    real trm_obs;
   
     for (i in 1:n_obs)
       phi_rep[i]= inv_logit(b_0+ b_juld*juld[i]+ b_juld2*juld2[i]+
@@ -293,11 +297,16 @@ cat("
     // posterior predictive
     for (n in 1:N){
       det_rep[n]= bernoulli_rng(phi_rep[n]);
-      r_obs[n]= det[n]- phi[n];
-      r_rep[n]= det_rep[n]- phi_rep[n];
+      t_rep[n]= det_rep[n]* temp[n];
+        // mig history
+      ir_rep[n]= (trans[n]-1)* (-1)* (det_rep[n]- phi_rep[n]);
+      tr_rep[n]= trans[n]* (det_rep[n]- phi_rep[n]);
+      ir_obs[n]= (trans[n]-1)* (-1)* (det[n]- phi[n]);
+      tr_obs[n]= trans[n]* (det[n]- phi[n]);
     }
-    t_obs= mean(r_obs);
-    t_rep= mean(r_rep);
+    tm_rep= mean(t_rep);
+    trm_rep= sum(ir_rep)/(sum(trans-1)*(-1))- sum(tr_rep)/sum(trans);
+    trm_obs= sum(ir_obs)/(sum(trans-1)*(-1))- sum(tr_obs)/sum(trans);
   }
 
 ",fill=TRUE, file=paste0(wd, "steelyhead/st_im/in_stan/st_im_glm.stan"))
@@ -311,11 +320,11 @@ require(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 # run stan ----
-# nc<- 4   ;   ni<- 60 # test run, burn-in 50%
+# nc<- 1; ni<- 60; nt<- 1 # test run, burn-in 50%
 # nc<- 4; ni<- 500; nt<- 1
 nc<- 4; ni<- 10000; nt<- 2
 
-parameters <- c('b_0','b_juld','b_juld2','b_temp','b_ftt','b_txf','b_trans','a_yr','sigma_yr','mu_v','sigma_v','t_obs','t_rep' )
+parameters <- c('b_0','b_juld','b_juld2','b_temp','b_ftt','b_txf','b_trans','a_yr','sigma_yr','mu_v','sigma_v','tm_rep','trm_rep','trm_obs')
 
 steely_fit<- stan(data=im_data_s, file=paste0(wd, "steelyhead/st_im/in_stan/st_im_glm.stan"), chains=nc, iter=ni, thin=nt, pars=parameters, include=TRUE)
 

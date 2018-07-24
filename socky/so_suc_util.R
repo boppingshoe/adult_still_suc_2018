@@ -26,10 +26,10 @@ so_load_dat<- function(wd){
   return(sos)
 }
 
-tempScale<- function(x) (x- mean(sos$ihr_temp))/ sd(sos$ihr_temp)
-tempScale2<- function(x) (x- mean(sos$ihr_temp^2))/ sd(sos$ihr_temp^2)
+tempScale_so<- function(x) (x- mean(sos$ihr_temp))/ sd(sos$ihr_temp)
+# tempScale2_so<- function(x) (x- mean(sos$ihr_temp^2))/ sd(sos$ihr_temp^2)
 
-fttScale<- function(x) (x- 8.37)/ 7.7
+fttScale_so<- function(x) (x- 8.37)/ 7.7
 
 vif_mer <- function (fit) {
   ## adapted from rms::vif
