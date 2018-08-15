@@ -98,7 +98,9 @@ x <- sqlQuery(channel=channel, stringsAsFactors=FALSE,
   WHERE  a.srrt = '32W' AND
   -- Exclude fish tagged as adults
   (a.length IS NULL OR a.length < 300) AND
-  SUBSTRING(a.river_km,1,3) > 470 AND
+  substring(a.river_km, 1, 3) = '522' AND
+  cast(substring(a.river_km, 5, 3) as int) > 173 AND
+
   a.boa_obs IS NOT NULL AND
   -- Can't distinguish ESU
   a.tag_site NOT IN ('MCN') AND
@@ -302,7 +304,7 @@ subset(x, year(x$grjObs) == x$boaYr & is.na(x$mcaObs) & x$grjObs < x$boaObs & x$
 x<- x[!x$tagId%in%c('3D9.1C2DA0E9CF','3D9.1C2D9C75D7'),]
 # GOJ
 subset(x, year(x$gojObs) == x$boaYr & is.na(x$mcaObs) & x$gojObs < x$boaObs & x$age == "Adult")
-x<- x[!x$tagId%in%c('3D9.1C2DA07780','3D9.1C2D546351'),]
+# x<- x[!x$tagId%in%c('3D9.1C2DA07780','3D9.1C2D546351'),]
 # LMJ
 subset(x, year(x$lmjObs) == x$boaYr & is.na(x$mcaObs) & x$lmjObs < x$boaObs & x$age == "Adult")
 x<- x[!x$tagId%in%c('3D9.1BF22DF252','3D9.1C2D551AE4'),]
@@ -458,7 +460,9 @@ x <- sqlQuery(channel=channel, stringsAsFactors=FALSE,
   WHERE  a.srrt = '32H' AND
   -- Exclude fish tagged as adults
   (a.length IS NULL OR a.length < 300) AND
-  SUBSTRING(a.river_km,1,3) > '470'  AND
+  substring(a.river_km, 1, 3) = '522' AND
+  cast(substring(a.river_km, 5, 3) as int) > 173 AND
+
   a.boa_obs IS NOT NULL AND
   DATEPART(YYYY, a.boa_obs) BETWEEN 2003 AND 2016 AND
   -- Cannot distinguish 'A' from 'B' run at these sites
@@ -714,6 +718,9 @@ mykiss$graDet<- ifelse(is.na(mykiss$graObs), 0, 1)
 
 names(mykiss) <- c("tag_id", "srrt", "mig_yr", "length", "tag_date", "tag_site", "rel_site", "rel_date", "rel_km", "boa_yr","boa_obs", "tda_obs", "mca_obs", "mca_yr", "iha_obs", "lma_obs", "goa_obs", "gra_obs", "pra_obs", "ria_obs", "wea_obs", "grj_obs", "goj_obs", "lmj_obs", "ihj_obs", "rrj_obs", "mcj_obs", "jdj_obs", "bon_obs", "capture_di", "mig_his", "mpg", "esu", "stock", "rear", "mca_jul", "iha_det", "gra_det")
 
+mykiss<- subset(mykiss, !rel_site %in% c("LYFE","TUCR","CURP") &
+    !tag_site %in% c("LYFE","TUCR","CURP"))
+
 save(mykiss, file=paste0(wd, "data_compile/st_data/mykiss.Rdata")) # just fishy
 #####
 
@@ -730,20 +737,21 @@ load(file=paste0(wd, "data_compile/low_snake_flow_2003_2018.Rdata")) # flow
 
 stlsdat<- merge(mykiss, tdls, by='obs_date')
 stlsdat<- merge(stlsdat, fdls, by='obs_date')
-stlsdat[279:351, 'ihr_temp']<- stlsdat[279:351, 'mcn_temp'] # replace weird ihr_temp with mcn_ temp
-a<- (17.42917-16.65417)/ (16.058333-15.941667)
-b<- 16.65417- 6.642895*15.941667
-stlsdat[3904:3927, 'ihr_temp']<- (stlsdat[3904:3927, 'mcn_temp']-b)/a # replace with regression
+
+
+stlsdat[c(60:77,400:404), 'ihr_temp']<- stlsdat[c(60:77,400:404), 'mcn_temp'] # replace with MCN
 stlsdat[stlsdat$mcn_temp>25&!is.na(stlsdat$mcn_temp),]$mcn_temp<- subset(stlsdat, mcn_temp>25)$ihr_temp
 
 # check temp data
-# plot(stlsdat$lgr_temp, stlsdat$mcn_temp, xlim=c(0,30), ylim=c(0,30))
-# plot(stlsdat$mcn_temp, stlsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))
-# plot(stlsdat$lgr_temp, stlsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))
+plot(stlsdat$lgr_temp, stlsdat$mcn_temp, xlim=c(0,30), ylim=c(0,30))
+plot(stlsdat$mcn_temp, stlsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))
+plot(stlsdat$lgr_temp, stlsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))
 
-# with(stlsdat, plot(mca_jul, mcn_temp, pch=20, cex=2, col=mig_yr, ylim=c(0, 23)))
-# with(stlsdat, plot(mca_jul, ihr_temp, pch=20, cex=2, col=mig_yr, ylim=c(0, 23)))
-# with(stlsdat, plot(mca_jul, lgr_temp, pch=20, cex=2, col=mig_yr, ylim=c(0, 23)))
+with(stlsdat, plot(mca_jul, mcn_temp, pch=20, cex=2, col=mig_yr, ylim=c(0, 23)))
+with(stlsdat, plot(mca_jul, ihr_temp, pch=20, cex=2, col=mig_yr, ylim=c(0, 23)))
+with(stlsdat, plot(mca_jul, lgr_temp, pch=20, cex=2, col=mig_yr, ylim=c(0, 23)))
+
+# stlsdat[stlsdat$ihr_temp<1,c('ihr_temp','mcn_temp')]
 
 save(stlsdat, file=paste0(wd, "data_compile/st_data/stlsdat.Rdata"))
 # load(file=paste0(wd, "data_compile/st_data/stlsdat.Rdata"))

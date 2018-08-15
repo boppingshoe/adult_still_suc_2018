@@ -19,6 +19,15 @@ load_dat_fc<- function(wd){
   fcs$temp2<- scale(fcs$ihr_temp^2)
   fcs$jul2<- scale(fcs$mca_jul^2)
   fcs$dis2<- scale(fcs$ihr_dis^2)
+  fcs$ftt_mi<- as.numeric(with(fcs, difftime(iha_obs, mca_obs, units='days')))
+  fcs$ftt_ig<- as.numeric(with(fcs, difftime(gra_obs, iha_obs, units='days')))
+  fcs$velrat<- (68/fcs$ftt_mi) / (157/fcs$ftt_ig)
+  fcs$mcstray<- apply (fcs[,c('pra_obs','ria_obs','wea_obs')],
+    1, function(x) as.numeric(any(!is.na(x))))
+  fcs$stray<- apply (fcs[,c('pra_obs','ria_obs','wea_obs')],
+    1, function(x) as.numeric(any(!is.na(x))))
+  fcs$stray<- ifelse((fcs$velrat>=0.2&fcs$velrat<=5)|is.na(fcs$velrat), fcs$stray, 1)
+  # fcs$stray<- ifelse(fcs$ftt< 21|is.na(fcs$ftt), fcs$stray, 1)
   fcs<- fcs[!is.na(fcs$ihr_temp),]
   
   return(fcs)
@@ -29,7 +38,7 @@ tempScale<- function(x) (x- mean(fcs$ihr_temp))/ sd(fcs$ihr_temp)
 julScale<- function(x) (x- mean(fcs$mca_jul))/ sd(fcs$mca_jul)
 julScale2<- function(x) (x- mean(fcs$mca_jul^2))/ sd(fcs$mca_jul^2)
 
-fttScale<- function(x) (x- 7.88)/ 4.29
+# fttScale<- function(x) (x- mean(nufcs$ftt, na.rm=TRUE))/ sd(nufcs$ftt, na.rm=TRUE)
 
 vif_mer <- function (fit) {
   ## adapted from rms::vif
@@ -51,7 +60,8 @@ vif_mer <- function (fit) {
 }
 
 # JAGS stuff
-prep_dat_fc<- function(fcs, typ='stan'){
+prep_dat_fc<- function(fcs_in, strytime, typ='stan'){
+  fcs<- subset(fcs_in, ftt< strytime|is.na(ftt))
   fcs<- fcs[order(fcs$ftt),]
 
   juld<- as.vector(fcs$jul_sca)
@@ -63,15 +73,20 @@ prep_dat_fc<- function(fcs, typ='stan'){
   # yr<- fcs$boa_yr-2002
   vel<- fcs$vel
   det<- fcs$gra_det
+  stray<- fcs$stray
+
   if(typ=='stan') {
     N<- nrow(fcs)
     n_obs<- sum(!is.na(fcs$ftt))
     n_mis<- N- n_obs
     vel_obs<- fcs[1:n_obs,]$vel
-    ftt_obs<- as.vector(fcs[1:n_obs,]$ftt_sca)
+    ftt_obs<- as.vector(fcs[1:n_obs,]$ftt)
+    # ftt_obs<- as.vector(fcs[1:n_obs,]$ftt_sca)
+    # m_ftt<- mean(fcs$ftt, na.rm=TRUE)
+    # sd_ftt<- sd(fcs$ftt, na.rm=TRUE)
     out_dat<- list(N=N, n_obs=n_obs, n_mis=n_mis,
       juld=juld, juld2=juld2, temp=temp, vel_obs=vel_obs,
-      ftt_obs=ftt_obs, trans=trans, det=det)
+      ftt_obs=ftt_obs, trans=trans, det=det, stray=stray)#, m_ftt=m_ftt, sd_ftt=sd_ftt)
   } else {
     n_ind<- nrow(fcs)
     out_dat<- list(det=det, n_ind=n_ind,
@@ -99,31 +114,14 @@ plot_pds<- function(pd, lab, nc=4, brks=50, colr=1){
 # surv vs. temp # temp range 10.97685 22.36957
 surv_temp<- function(b, juld=mean(fcs$mca_jul), alpha=13, omega=23, lcol=c('cyan','lightpink'), lw=1){
   curve(plogis(b[1]+ b[2]*julScale(juld)+ b[3]*julScale2(juld^2)+ b[4]*tempScale(x)), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
-  curve(plogis(b[1]+ b[2]*julScale(juld)+ b[3]*julScale2(juld^2)+ b[4]*tempScale(x)+ b[5]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+ b[2]*julScale(juld)+ b[3]*julScale2(juld^2)+ b[4]*tempScale(x)+ b[6]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
 }
 # surv vs. ftt # ftt range 3.673646 81.597697
 surv_ftt<- function(b, temp=mean(fcs$ihr_temp), alpha=3, omega=50, lcol=c('chartreuse','aquamarine'), lw=1){
-  curve(plogis(b[1]+ b[2]*tempScale(temp)+ b[3]*fttScale(x)+ b[4]*tempScale(temp)*fttScale(x)), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
-  curve(plogis(b[1]+ b[2]*tempScale(temp+2)+ b[3]*fttScale(x)+ b[4]*tempScale(temp+2)*fttScale(x)), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+ b[4]*tempScale(temp)+ b[5]*x), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+ b[4]*tempScale(temp+2)+ b[5]*x), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
 }
 
-# plot results (intergrated model)
-# surv vs. ftt
-# surv_ftt<- function(g, lcol='grey50', lw=1, alpha=3, omega=70){
-#   curve(exp(-(g[1]+ g[2]*x) ),
-#     alpha, omega, col=lcol, lwd=lw, add=TRUE)
-# } 
-# # surv vs. temp
-# surv_temp<- function(b, lcol=c('cyan','lightpink'), lw=1, alpha=18.62, omega=21.87, sig_v=10){
-#   eps_v<- rnorm(1, 0, sig_v)
-#   curve(b[1]*exp(-b[2]*(236/(b[3]+ b[4]*tempScale(x)+ b[5]*tempScale2(x^2)+ eps_v))), alpha, omega, col=lcol[1],lwd=lw, add=TRUE)
-#   curve(b[1]*exp(-b[2]*(236/(b[3]+ b[4]*tempScale(x)+ b[5]*tempScale2(x^2)+ b[6]+ eps_v))), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
-# } 
-# # ftt vs. temp (not in use)
-# ftt_temp<- function(b, lcol=c('cyan','lightpink'), lw=1, alpha=18.62, omega=21.87){
-#   curve(236/(b[1]+ b[2]*tempScale(x)+ b[3]*tempScale2(x^2)), alpha, omega, col=lcol[1],lwd=lw, add=TRUE)
-#   curve(236/(b[1]+ b[2]*tempScale(x)+ b[3]*tempScale2(x^2)+ b[4]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
-# } 
 
 
 

@@ -4,12 +4,15 @@
     int<lower=0> n_mis;
     int<lower=0> N;
     int<lower=0, upper=1> det[N];
+      int<lower=0, upper=1> stray[N];
     real juld[N];
     real juld2[N];
     real temp[N];
     real<lower=0> vel_obs[n_obs];
     real ftt_obs[n_obs];
     vector<lower=0, upper=1>[N] trans;
+    // real m_ftt;
+    // real sd_ftt;
   }
   
   parameters{
@@ -18,11 +21,11 @@
     real b_juld2;
     real b_temp;
     real b_ftt;
-    real b_txf;
+    // real b_txf;
     real b_trans;
     
-    real<lower=0> mu_v;
-    real<lower=0> sigma_v;
+    real<lower=0> mu_v[2];
+    real<lower=0> sigma_v[2];
     
     real<lower=0> vel_mis[n_mis];
   }
@@ -32,12 +35,13 @@
     real ftt_mis[n_mis];
     for (i in 1:n_obs)
       phi[i]= inv_logit(b_0+ b_juld*juld[i]+ b_juld2*juld2[i]+
-        b_temp*temp[i]+ b_ftt*ftt_obs[i]+ b_txf*temp[i]*ftt_obs[i]+
+        b_temp*temp[i]+ b_ftt*ftt_obs[i]+// b_txf*temp[i]*ftt_obs[i]+
         b_trans*trans[i]);
     for (j in (n_obs+1):N) {
-      ftt_mis[j-n_obs]= (225/vel_mis[j-n_obs]- 7.88)/ 4.29;
+      // ftt_mis[j-n_obs]= 225/ vel_mis[j-n_obs]- m_ftt)/ sd_ftt;
+      ftt_mis[j-n_obs]= 225/ vel_mis[j-n_obs];
       phi[j]= inv_logit(b_0+ b_juld*juld[j]+ b_juld2*juld2[j]+
-        b_temp*temp[j]+ b_ftt*ftt_mis[j-n_obs]+ b_txf*temp[j]*ftt_mis[j-n_obs]+
+        b_temp*temp[j]+ b_ftt*ftt_mis[j-n_obs]+// b_txf*temp[j]*ftt_mis[j-n_obs]+
         b_trans*trans[j]);
     }
   }
@@ -49,7 +53,7 @@
     b_juld2~ student_t(1, 0, 2.5);
     b_temp~ student_t(1, 0, 2.5);
     b_ftt~ student_t(1, 0, 2.5);
-    b_txf~ student_t(1, 0, 2.5);
+    // b_txf~ student_t(1, 0, 2.5);
     b_trans~ student_t(1, 0, 2.5);
 
     det~ bernoulli(phi);
@@ -57,8 +61,21 @@
     // FTT
     mu_v~ student_t(1, 0, 10);
     sigma_v~ student_t(1, 0, 2.25);
-    vel_obs~ normal(mu_v, sigma_v);
-    vel_mis~ normal(mu_v, sigma_v);
+    
+    for (i in 1:n_obs){
+      if (stray[i] == 0)
+        target += normal_lpdf(vel_obs[i] | mu_v[1], sigma_v[1]);
+      else
+        target += normal_lpdf(vel_obs[i] | mu_v[2], sigma_v[2]);
+    }
+    for (j in (n_obs+1):N){
+      if (stray[j] == 0)
+        target += normal_lpdf(vel_mis[j-n_obs] | mu_v[1], sigma_v[1]);
+      else
+        target += normal_lpdf(vel_mis[j-n_obs] | mu_v[2], sigma_v[2]);
+    }
+    // vel_obs~ normal(mu_v, sigma_v);
+    // vel_mis~ normal(mu_v, sigma_v);
   }
   
   generated quantities{
@@ -75,11 +92,11 @@
     
     for (i in 1:n_obs)
       phi_rep[i]= inv_logit(b_0+ b_juld*juld[i]+ b_juld2*juld2[i]+
-        b_temp*temp[i]+ b_ftt*ftt_obs[i]+ b_txf*temp[i]*ftt_obs[i]+
+        b_temp*temp[i]+ b_ftt*ftt_obs[i]+// b_txf*temp[i]*ftt_obs[i]+
         b_trans*trans[i]);
     for (j in (n_obs+1):N)
       phi_rep[j]= inv_logit(b_0+ b_juld*juld[j]+ b_juld2*juld2[j]+
-        b_temp*temp[j]+ b_ftt*ftt_mis[j-n_obs]+ b_txf*temp[j]*ftt_mis[j-n_obs]+
+        b_temp*temp[j]+ b_ftt*ftt_mis[j-n_obs]+// b_txf*temp[j]*ftt_mis[j-n_obs]+
         b_trans*trans[j]);
     // posterior predictive
     for (n in 1:N){

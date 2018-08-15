@@ -16,17 +16,26 @@ load_dat_st<- function(wd){
   sts$temp2<- scale(sts$ihr_temp^2)
   sts$jul2<- scale(sts$mca_jul^2)
   sts$dis2<- scale(sts$ihr_dis^2)
+  sts$ftt_mi<- as.numeric(with(sts, difftime(iha_obs, mca_obs, units='days')))
+  sts$ftt_ig<- as.numeric(with(sts, difftime(gra_obs, iha_obs, units='days')))
+  sts$velrat<- (68/sts$ftt_mi) / (157/sts$ftt_ig)
+  sts$mcstray<- apply (sts[,c('pra_obs','ria_obs','wea_obs')],
+    1, function(x) as.numeric(any(!is.na(x))))
+  sts$stray<- apply (sts[,c('pra_obs','ria_obs','wea_obs')],
+    1, function(x) as.numeric(any(!is.na(x))))
+  sts$stray<- ifelse((sts$velrat>=0.2 & sts$velrat<=5)|is.na(sts$velrat), sts$stray, 1)
+  # sts$stray<- ifelse(sts$ftt< 60|is.na(sts$ftt), sts$stray, 1)
   sts<- sts[!is.na(sts$ihr_temp),]
   return(sts)
 }
 
 tempScale_st<- function(x) (x- mean(sts$ihr_temp))/ sd(sts$ihr_temp)
-tempScale2_st<- function(x) (x- mean(sts$ihr_temp^2))/ sd(sts$ihr_temp^2)
+# tempScale2_st<- function(x) (x- mean(sts$ihr_temp^2))/ sd(sts$ihr_temp^2)
 
 julScale_st<- function(x) (x- mean(sts$mca_jul))/ sd(sts$mca_jul)
 julScale2_st<- function(x) (x- mean(sts$mca_jul^2))/ sd(sts$mca_jul^2)
 
-fttScale_st<- function(x) (x- 23.04)/ 35.04
+# fttScale_st<- function(x) (x- mean(nusts$ftt, na.rm=TRUE))/ sd(nusts$ftt, na.rm=TRUE)
 
 vif_mer <- function (fit) {
   ## adapted from rms::vif
@@ -81,43 +90,48 @@ plot_pds<- function(pd, lab, nc=4, brks=50, colr=1){
 }
 
 # Stan stuff
-stan_dat<- function(sts){
+stan_dat<- function(sts_in, strytime){
+  sts<- subset(sts_in, ftt< strytime|is.na(ftt))
+  sts<- sts[order(sts$ftt),]
   N<- nrow(sts)
   n_obs<- sum(!is.na(sts$ftt))
   n_mis<- N- n_obs
-  sts<- sts[order(sts$ftt),]
+  # m_ftt<- mean(sts$ftt, na.rm=TRUE)
+  # sd_ftt<- sd(sts$ftt, na.rm=TRUE)
   
   juld<- as.vector(sts$jul_sca)
   juld2<- as.vector(scale(sts$mca_jul^2))
   temp<- as.vector(sts$temp_sca)
   vel_obs<- sts[1:n_obs,]$vel
-  ftt_obs<- as.vector(sts[1:n_obs,]$ftt_sca)
+  ftt_obs<- as.vector(sts[1:n_obs,]$ftt)
+  # ftt_obs<- as.vector(sts[1:n_obs,]$ftt_sca)
   trans<- ifelse(sts$mig_his=='Trans', 1, 0)
-  yr<- sts$mca_yr-2002
+  stray<- sts$stray
   det<- sts$gra_det
 
   out_dat<- list(N=N, n_obs=n_obs, n_mis=n_mis,
-    juld=juld, juld2=juld2, temp=temp, vel_obs=vel_obs,
-    ftt_obs=ftt_obs, trans=trans, yr=yr, det=det)
+    juld=juld, juld2=juld2, temp=temp,
+    vel_obs=vel_obs, ftt_obs=ftt_obs, trans=trans, det=det,
+    stray=stray)
   
   return(out_dat)
 }
 
 
 # survival plots
-# surv vs. temp # temp range 10.97685 22.36957
-surv_temp_st<- function(b, juld=mean(sts$mca_jul), ftt=median(sts$ftt, na.rm=TRUE), alpha=13, omega=23, lcol=c('cyan','lightpink'), lw=1){
-  curve(plogis(b[1]+ b[2]*julScale_st(juld)+ b[3]*julScale2_st(juld^2)+ b[4]*tempScale_st(x)+ b[5]*fttScale_st(ftt)+ b[6]*fttScale_st(ftt)*tempScale_st(x)), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
-  curve(plogis(b[1]+ b[2]*julScale_st(juld)+ b[3]*julScale2_st(juld^2)+ b[4]*tempScale_st(x)+ b[5]*fttScale_st(ftt)+ b[6]*fttScale_st(ftt)*tempScale_st(x)+ b[7]), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+# surv vs. temp 
+surv_temp_st<- function(b, juld=mean(sts$mca_jul), ftt=median(sts$ftt, na.rm=TRUE), alpha=14, omega=23, lcol=c('cyan','lightpink'), lw=1){
+  curve(plogis(b[1]+ b[2]*tempScale_st(x)+ b[3]*ftt),
+    alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+ b[2]*tempScale_st(x)+ b[3]*ftt+ b[4]),
+    alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
 }
-# surv vs. ftt # ftt range 3.673646 81.597697
-surv_ftt_st<- function(b, jdlo=mean(sts$mca_jul), jdhi=mean(sts$mca_jul), temp=mean(sts$ihr_temp), alpha=3, omega=50, lcol=c('chartreuse','aquamarine'), lw=1){
-  curve(plogis(b[1]+ b[2]*tempScale_st(temp)+ b[3]*fttScale_st(x)+
-      b[4]*tempScale_st(temp)*fttScale_st(x)+ b[5]*julScale_st(jdlo)+
-      b[6]*julScale2_st(jdlo^2)), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
-  curve(plogis(b[1]+ b[2]*tempScale_st(temp+2)+ b[3]*fttScale_st(x)+
-      b[4]*tempScale_st(temp+2)*fttScale_st(x)+ b[5]*julScale_st(jdhi)+
-      b[6]*julScale2_st(jdhi^2)), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+# surv vs. ftt 
+surv_ftt_st<- function(b, temp=mean(sts$ihr_temp), alpha=3, omega=100, lcol=c('chartreuse','aquamarine'), lw=1){
+  curve(plogis(b[1]+ b[2]*tempScale_st(temp)+ b[3]*x),
+    alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+ b[2]*tempScale_st(temp+2)+ b[3]*x),
+    alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
 }
 
 

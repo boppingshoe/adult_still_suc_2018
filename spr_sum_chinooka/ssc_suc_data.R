@@ -46,11 +46,8 @@ FROM   PITGLOBAL.dbo.[INTERROGATION BY SITE]
 
 WHERE  srrt IN ('11H', '11W', '12H', '12W') AND
 DATEPART(YYYY, boa_obs) >= 2003 AND
--- SUBSTRING(a.river_km,1,3) > 470 AND
-CONVERT(INT, 
-  CASE
-  WHEN IsNumeric(SUBSTRING(river_km,1,3)) = 1 THEN SUBSTRING(river_km,1,3)
-  ELSE 0 END) > 470 
+substring(river_km, 1, 3) = '522' AND
+cast(substring(river_km, 5, 3) as int) > 173
 
 ORDER BY boa_obs  
 
@@ -156,7 +153,8 @@ x$esu[substr(x$rel_km,1,3) == "539"] <- "Middle Columbia"
 # You need to exclude Tucannon and Lyon's Ferry origin fish.
 # Some of thse fish stray, but most will return to their origin below Granite
 # Hence they are not available for detection at Lower Granite which would bias CJS results
-ssc1 <- subset(x, !x$rel_site %in% c("LYFE","TUCR","CURP"))
+ssc1 <- subset(x, !rel_site %in% c("LYFE","TUCR","CURP") &
+    !tag_site %in% c("LYFE","TUCR","CURP"))
 
 # export data ----
 save(ssc1, file=paste0(wd, "data_compile/ssc_data/ssc1.Rdata"))
@@ -178,13 +176,13 @@ ssclsdat<- merge(sscls, tdls, by='obs_date')
 ssclsdat<- merge(ssclsdat, fdls, by='obs_date')
 
 # check temp data
-# plot(ssclsdat$lgr_temp, ssclsdat$mcn_temp, xlim=c(0,30), ylim=c(0,30))
-# plot(ssclsdat$mcn_temp, ssclsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))
-# plot(ssclsdat$lgr_temp, ssclsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))
+plot(ssclsdat$lgr_temp, ssclsdat$mcn_temp, xlim=c(0,30), ylim=c(0,30))
+plot(ssclsdat$mcn_temp, ssclsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))
+plot(ssclsdat$lgr_temp, ssclsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))
 
-# with(ssclsdat, plot(mca_jul, mcn_temp, pch=20, cex=2, col=mig_yr, ylim=c(8, 23)))
-# with(ssclsdat, plot(mca_jul, ihr_temp, pch=20, cex=2, col=mig_yr, ylim=c(8, 23)))
-# with(ssclsdat, plot(mca_jul, lgr_temp, pch=20, cex=2, col=mig_yr, ylim=c(8, 23)))
+with(ssclsdat, plot(mca_jul, mcn_temp, pch=20, cex=2, col=mig_yr, ylim=c(8, 23)))
+with(ssclsdat, plot(mca_jul, ihr_temp, pch=20, cex=2, col=mig_yr, ylim=c(8, 23)))
+with(ssclsdat, plot(mca_jul, lgr_temp, pch=20, cex=2, col=mig_yr, ylim=c(8, 23)))
 
 save(ssclsdat, file=paste0(wd, "data_compile/ssc_data/ssclsdat.Rdata"))
 

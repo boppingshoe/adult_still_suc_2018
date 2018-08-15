@@ -40,11 +40,9 @@ FROM   PITGLOBAL.dbo.[INTERROGATION BY SITE]
 
 WHERE  srrt IN ('13H', '13W') AND
 year(boa_obs) >= 2003 AND
---SUBSTRING(river_km,1,3) > 470
-CONVERT(INT,
-        CASE
-        WHEN IsNumeric(SUBSTRING(river_km,1,3)) = 1 THEN SUBSTRING(river_km,1,3)
-        ELSE 0 END) > 470 
+substring(river_km, 1, 3) = '522' AND
+cast(substring(river_km, 5, 3) as int) > 173
+
 ORDER BY boa_obs
 ")
 
@@ -147,7 +145,8 @@ names(x) <- c("tag_id", "dim_id", "srrt", "rear", "length", "mig_yr", "tag_date"
    # You need to exclude Tucannon and Lyon's Ferry origin fish.
    # Some of thse fish stray, but most will return to their origin below Granite
    # Hence they are not available for detection at Lower Granite which would bias CJS results
-   fc1 <- subset(x, !x$rel_site %in% c("LYFE","TUCR","CURP"))
+   fc1 <- subset(x, !rel_site %in% c("LYFE","TUCR","CURP") &
+       !tag_site %in% c("LYFE","TUCR","CURP"))
    
 # (stop it now) ----
 # Assign Origin ----
@@ -442,16 +441,17 @@ load(file=paste0(wd, "data_compile/low_snake_flow_2003_2018.Rdata")) # flow
 
 fclsdat<- merge(fcls, tdls, by='obs_date')
 fclsdat<- merge(fclsdat, fdls, by='obs_date')
-fclsdat[4468:4482, 'mcn_temp']<- 18.135 # replace NA with average beteen 9/30 and 10/3
-fclsdat[4508:4511, 'mcn_temp']<- 16.325 # replace NA with average beteen 10/10 and 10/14
-fclsdat[36:47, 'ihr_temp']<- fclsdat[36:47, 'mcn_temp'] # replace weird ihr_temp with mcn_ temp
-# plot(fclsdat$lgr_temp, fclsdat$mcn_temp, xlim=c(0,30), ylim=c(0,30))
-# plot(fclsdat$mcn_temp, fclsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))
-# plot(fclsdat$lgr_temp, fclsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))
+
+fclsdat[2311:2314, 'mcn_temp']<- fclsdat[2311:2314, 'ihr_temp']
+fclsdat[12:13, 'ihr_temp']<- fclsdat[12:13, 'mcn_temp'] # replace weird ihr_temp with mcn_ temp
+
+plot(fclsdat$lgr_temp, fclsdat$mcn_temp, xlim=c(0,30), ylim=c(0,30))
+plot(fclsdat$mcn_temp, fclsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))
+plot(fclsdat$lgr_temp, fclsdat$ihr_temp, xlim=c(0,30), ylim=c(0,30))
 # LGR temp is messed up
-# with(fclsdat, plot(mca_jul, mcn_temp, pch=20, cex=2, col=mig_yr, ylim=c(8, 23)))
-# with(fclsdat, plot(mca_jul, ihr_temp, pch=20, cex=2, col=mig_yr, ylim=c(8, 23)))
-# with(fclsdat, plot(mca_jul, lgr_temp, pch=20, cex=2, col=mig_yr, ylim=c(8, 23)))
+with(fclsdat, plot(mca_jul, mcn_temp, pch=20, cex=2, col=mig_yr, ylim=c(8, 23)))
+with(fclsdat, plot(mca_jul, ihr_temp, pch=20, cex=2, col=mig_yr, ylim=c(8, 23)))
+with(fclsdat, plot(mca_jul, lgr_temp, pch=20, cex=2, col=mig_yr, ylim=c(8, 23)))
 
 save(fclsdat, file=paste0(wd, "data_compile/fc_data/fclsdat.Rdata"))
 

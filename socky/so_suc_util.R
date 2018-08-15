@@ -21,15 +21,23 @@ so_load_dat<- function(wd){
   sos$temp2<- scale(sos$ihr_temp^2)
   sos$jul2<- scale(sos$mca_jul^2)
   sos$dis2<- scale(sos$ihr_dis^2)
+  sos$ftt_mi<- as.numeric(with(sos, difftime(iha_obs, mca_obs, units='days')))
+  sos$ftt_ig<- as.numeric(with(sos, difftime(gra_obs, iha_obs, units='days')))
+  sos$velrat<- (68/sos$ftt_mi) / (157/sos$ftt_ig)
+  sos$mcstray<- apply (sos[,c('pra_obs','ria_obs','wea_obs')],
+    1, function(x) as.numeric(any(!is.na(x))))
+  sos$stray<- apply (sos[,c('pra_obs','ria_obs','wea_obs')],
+    1, function(x) as.numeric(any(!is.na(x))))
+  sos$stray<- ifelse((sos$velrat>=0.2&sos$velrat<=5)|is.na(sos$velrat), sos$stray, 1)
+  # sos$stray<- ifelse(sos$ftt< 21|is.na(sos$ftt), sos$stray, 1)
   sos<- sos[!is.na(sos$ihr_temp),]
   
   return(sos)
 }
 
-tempScale_so<- function(x) (x- mean(sos$ihr_temp))/ sd(sos$ihr_temp)
-# tempScale2_so<- function(x) (x- mean(sos$ihr_temp^2))/ sd(sos$ihr_temp^2)
+tempScale_so<- function(x) (x- mean(nusos$ihr_temp))/ sd(nusos$ihr_temp)
 
-fttScale_so<- function(x) (x- 8.37)/ 7.7
+# fttScale_so<- function(x) (x- mean(nusos$ftt, na.rm=TRUE))/ sd(nusos$ftt, na.rm=TRUE)
 
 vif_mer <- function (fit) {
   ## adapted from rms::vif
@@ -51,8 +59,9 @@ vif_mer <- function (fit) {
 }
 
 # JAGS/Stan stuff
-so_prep_dat<- function(sos_in, typ='stan'){
-  sos<- sos_in[order(sos_in$ftt),]
+so_prep_dat<- function(sos_in, strytime, typ='stan'){
+  sos<- subset(sos_in, ftt< strytime|is.na(ftt))
+  sos<- sos[order(sos$ftt),]
 
   temp<- as.vector(sos$temp_sca)
   dis<- as.vector(sos$dis_sca)
@@ -66,10 +75,15 @@ so_prep_dat<- function(sos_in, typ='stan'){
     n_obs<- sum(!is.na(sos$ftt))
     n_mis<- N- n_obs
     vel_obs<- sos[1:n_obs,]$vel
-    ftt_obs<- as.vector(sos[1:n_obs,]$ftt_sca)
+    ftt_obs<- as.vector(sos[1:n_obs,]$ftt)
+    # ftt_obs<- as.vector(sos[1:n_obs,]$ftt_sca)
+    # m_ftt<- mean(sos$ftt, na.rm=TRUE)
+    # sd_ftt<- sd(sos$ftt, na.rm=TRUE)
+    stray<- sos$stray
     out_dat<- list(N=N, n_obs=n_obs, n_mis=n_mis,
       temp=temp, dis=dis, vel_obs=vel_obs,
-      ftt_obs=ftt_obs, trans=trans, yr=yr, det=det)
+      ftt_obs=ftt_obs, trans=trans, yr=yr, det=det,
+      stray=stray)#, m_ftt=m_ftt, sd_ftt=sd_ftt)
   } else {
     n_ind<- nrow(sos)
     out_dat<- list(det=det, n_ind=n_ind,
@@ -95,23 +109,17 @@ plot_pds<- function(pd, lab, nc=4, brks=50, colr=1){
 # survival plots
 # surv vs. temp
 surv_temp_so<- function(b, alpha=13, omega=23, lcol=c('cyan','lightpink'), lw=1){
-  curve(plogis(b[1]+ b[2]*tempScale(x)),
+  curve(plogis(b[1]+ b[2]*tempScale_so(x)),
     alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
-  curve(plogis(b[1]+ b[2]*tempScale(x)+ b[3]),
+  curve(plogis(b[1]+ b[2]*tempScale_so(x)+ b[4]),
     alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
 }
 # surv vs. ftt
-# surv_ftt_so<- function(b, temp=mean(sos$ihr_temp), alpha=3, omega=30, lcol=c('chartreuse','aquamarine'), lw=1){
-#   curve(plogis(b[1]+ b[2]*tempScale(temp)+ b[3]*fttScale(x)+ b[4]*tempScale(temp)*fttScale(x)), alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
-#   curve(plogis(b[1]+ b[2]*tempScale(temp+2)+ b[3]*fttScale(x)+ b[4]*tempScale(temp+2)*fttScale(x)), alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
-# }
-
-# no temp x ftt
 surv_ftt_so<- function(b, temp=mean(sos$ihr_temp), alpha=3, omega=30, lcol=c('chartreuse','aquamarine'), lw=1){
-  curve(plogis(b[1]+ b[2]*tempScale(temp)+ b[3]*fttScale(x)),
-    alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
-  curve(plogis(b[1]+ b[2]*tempScale(temp+2)+ b[3]*fttScale(x)),
-    alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+ b[2]*tempScale_so(temp)+ b[3]*x),
+      alpha, omega, col=lcol[1], lwd=lw, add=TRUE)
+  curve(plogis(b[1]+ b[2]*tempScale_so(temp+2)+ b[3]*x),
+      alpha, omega, col=lcol[2], lwd=lw, add=TRUE)
 }
 
 

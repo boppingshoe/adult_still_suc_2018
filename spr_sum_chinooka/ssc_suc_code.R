@@ -206,26 +206,6 @@ hist(subset(sscs, run=='spring')$mca_jul, breaks=100, freq=FALSE, add=TRUE, col=
 hist(subset(sscs, run=='summer')$mca_jul, breaks=50, freq=FALSE, add=TRUE, col=rgb(1,0,0,0.5))
 abline(h=20/750, lty=2)
 
-# model selection ----
-m1<- glm(gra_det~ jul_sca+ jul2+ temp_sca+ temp2+ dis_sca+ dis2+ mig_his+ as.factor(mca_yr), family= binomial, data= sscs)
-m2<- update(m1, .~ .- as.factor(mca_yr))
-AIC(m1,m2)
-#     df      AIC
-# m1 22 9350.091
-# m2  8 9463.816
-(9463.816-9350.091)/ (22-8)
-
-m1<- glmer(gra_det~ jul_sca+ temp_sca+ temp2+ dis_sca+ mig_his+ (1|mca_yr), family= binomial, data= sscs)
-
-m2<- update(m1, .~ .- jul_sca)
-m3<- update(m2, .~ .- dis_sca)
-
-AIC(m1,m2,m3)
-#    df      AIC
-# m1  7 9373.739
-# m2  6 9372.611
-# m3  5 9379.814
-
 # temp and arrival ----
 load(file=paste0(wd, 'data_compile/low_snake_temp_2003_2018.Rdata')) # temper
 require(ggplot2)
@@ -283,6 +263,50 @@ hist(tr, breaks=30, main='Migration History', xlab= NULL, col='grey50', border='
 abline(v=tr_obs, col='red', lwd=3)
 
 mtext('Difference in Conversion', side=1, outer=TRUE, line=0, cex=1.2)
+# model selection ----
+m1<- glm(gra_det~ jul_sca+ jul2+ temp_sca+ temp2+ dis_sca+ dis2+ mig_his+ run+ as.factor(mca_yr), family= binomial, data= sscs)
+m2<- update(m1, .~ .- as.factor(mca_yr))
+AIC(m1,m2)
+#     df      AIC
+# m1 23 9280.473
+# m2  9 9367.917
+(9280.472- 9367.917)/ (23- 8)
+
+# library(lme4)
+# m1<- glmer(gra_det~ jul_sca+ jul2+ temp_sca+ temp2+ dis_sca+ dis2+ mig_his+ run+ (1|mca_yr), family= binomial, data= sscs) # failed to converge
+
+drop1(m1, test='Chisq')
+m2<- update(m1, .~ .- jul2- jul_sca)
+drop1(m2, test='Chisq')
+m3<- update(m2, .~ .- dis2)
+drop1(m3, test='Chisq')
+m4<- update(m3, .~ .- dis_sca)
+
+AIC(m1,m2,m3,m4)
+#    df      AIC
+# m1 23 9280.473
+# m2 21 9279.298
+# m3 20 9281.340
+# m4 19 9290.256
+car::vif(m3)
+m4<- update(m3, .~ .- temp2)
+car::vif(m4) # it's fine
+
+# check stray assignment ----
+ftt_stry<- table(sscs$stray, round(sscs$ftt))
+barplot(ftt_stry, main="Ftt for 0 vs 1 detection",
+  xlab="Days", col=c("black","deeppink"),
+  legend = rownames(ftt_stry))
+
+gs<- table(sscs$gra_det, sscs$stray)
+mcgs<- table(sscs$gra_det, sscs$mcstray)
+gs[2,2]<- gs[2,2]-mcgs[2,2]
+stry_tbl<- rbind(c(' ','Erratic','Stray'), cbind(gs, mcgs[,2]))
+stry_tbl[2,2]<- '-'
+rownames(stry_tbl)<- c(' ', 'Missing', 'Succeed')
+colnames(stry_tbl)<- c('Continuous', 'Interruted', ' ')
+noquote(stry_tbl)
+
 #####
 
 # same shit in Stan
@@ -297,6 +321,7 @@ cat("
     int<lower=0> n_obs;
     int<lower=0> n_mis;
     int<lower=0> N;
+      int<lower=0, upper=1> stray[N];
     int<lower=0, upper=1> det[N];
     vector<lower=0, upper=1>[N] summer;
     real temp[N];
@@ -319,8 +344,8 @@ cat("
     
     vector[15] a_yr;
     real<lower=0,upper=5> sigma_yr;
-    real<lower=0> mu_v;
-    real<lower=0> sigma_v;
+    real<lower=0> mu_v[2];
+    real<lower=0> sigma_v[2];
     
     real<lower=0> vel_mis[n_mis];
   }
@@ -333,7 +358,7 @@ cat("
         b_temp2*temp2[i]+ b_ftt*ftt_obs[i]+ b_dis*dis[i]+
         b_trans*trans[i]+ a_yr[yr[i]]);
     for (j in (n_obs+1):N) {
-      ftt_mis[j-n_obs]= (225/vel_mis[j-n_obs]- 8.95)/ 6.36;
+      ftt_mis[j-n_obs]= 225/ vel_mis[j-n_obs];
       phi[j]= inv_logit(b_0+ b_run*summer[j]+ b_temp*temp[j]+
         b_temp2*temp2[j]+ b_ftt*ftt_mis[j-n_obs]+ b_dis*dis[j]+
         b_trans*trans[j]+ a_yr[yr[j]]);
@@ -358,8 +383,18 @@ cat("
     // FTT
     mu_v~ student_t(1, 0, 10);
     sigma_v~ student_t(1, 0, 2.25);
-    vel_obs~ normal(mu_v, sigma_v);
-    vel_mis~ normal(mu_v, sigma_v);
+    for (i in 1:n_obs){
+      if (stray[i] == 0)
+        target += normal_lpdf(vel_obs[i] | mu_v[1], sigma_v[1]);
+      else
+        target += normal_lpdf(vel_obs[i] | mu_v[2], sigma_v[2]);
+    }
+    for (j in (n_obs+1):N){
+      if (stray[j] == 0)
+        target += normal_lpdf(vel_mis[j-n_obs] | mu_v[1], sigma_v[1]);
+      else
+        target += normal_lpdf(vel_mis[j-n_obs] | mu_v[2], sigma_v[2]);
+    }
   }
   
   generated quantities{
@@ -423,17 +458,16 @@ options(mc.cores = parallel::detectCores())
 # run stan ----
 # nc<- 1; ni<- 60; nt<- 1 # test run, burn-in 50%
 # nc<- 4; ni<- 500; nt<- 1
-nc<- 4; ni<- 5000; nt<- 1 # 2 hours
+# nc<- 4; ni<- 5000; nt<- 1 # 2.28 hours
+nc<- 4; ni<- 10000; nt<- 2
 
-parameters <- c('b_0','b_run','b_temp','b_temp2','b_ftt','b_dis','b_trans','a_yr','sigma_yr','mu_v','sigma_v','tm_rep','trm_rep','trm_obs','spm_rep','spm_obs')
+parameters <- c('b_0','b_run','b_temp','b_temp2','b_ftt','b_dis','b_trans','a_yr','sigma_yr','mu_v','sigma_v','tm_rep','trm_rep','trm_obs','spm_rep','spm_obs','vel_mis')
 
 ssc_fit<- stan(data=im_data, file=paste0(wd, "spr_sum_chinooka/ssc_im/in_stan/ssc_im_glm.stan"), chains=nc, iter=ni, thin=nt, pars=parameters, include=TRUE)
 
 fit_summ <- summary(ssc_fit)
-round(fit_summ$summary, 3)
-
-# steely_sims <- extract(steely_fit)
-# print(names(steely_sims))
+round(fit_summ$summary, 3)[c(1:32,1332),]
+sum(fit_summ$summary[,10]>1.01)
 
 df_ssc <- as.data.frame(ssc_fit)
 dim(df_ssc)
